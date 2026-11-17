@@ -12,14 +12,16 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - App is gated: signed out → AuthStack (Welcome → SignIn / AccountType → SignUpPersonal / SignUpOrganization).
 - **personal**: `users/{uid}.accountType = "personal"` (missing = personal for old accounts).
 - **organization**: `accountType = "organization"`, `orgStatus` pending|verified|rejected. Details + verification code in `orgApplications/{uid}`. Verification = email confirmed + org sends the `VT-XXXXXX` code from its official page/email + owner approves in Admin tab.
-- **owner**: has a doc at `owners/{uid}`. Sees the Admin tab (review orgs, add/remove owners). First owner must be created in the Firebase console.
+- **owner**: has a doc at `owners/{uid}`. Full Admin tab: Organizations, Content, Team (add/remove owners + testers). First owner must be created in the Firebase console.
+- **tester**: has a doc at `testers/{uid}` (added by owners in Admin → Team). Admin tab without Team: review orgs + edit jobs/events/leagues. Sees Tester badge + debug card on Profile.
+- `isStaff` (useAuth + rules) = owner or tester.
 - `src/config.js` — `VERIFICATION_CONTACT` (where orgs send the code), org types.
 - Logo: `assets/logo.png` (placeholder copy of icon.png — replace with the real logo).
 
 ## Structure
 
-- `App.js` — auth gate + tabs (each a stack): Jobs, Events, Leagues, Chat (ChatHome → ChatRoom / NewGroup / AddFriend), Profile (→ ResubmitOrg), Admin (owners only: AdminHome → OrgReview / AddOwner).
-- `src/admin/api.js` — org review + owner management.
+- `App.js` — auth gate + tabs (each a stack): Jobs, Events, Leagues, Chat (ChatHome → ChatRoom / NewGroup / AddFriend), Profile (→ ResubmitOrg), Admin (staff only: AdminHome → OrgReview / ContentEdit / AddTeamMember).
+- `src/admin/api.js` — org review, team (owners/testers), content save/delete. `src/admin/contentSchemas.js` — editor field definitions for jobs/events/leagues.
 - `src/components/OrgFields.js` — shared organization details form + validation.
 - `src/firebase.js` — app/db/auth init from `EXPO_PUBLIC_FIREBASE_*` env vars (`.env.local` locally, `eas.json` for builds). All null when unconfigured.
 - `src/auth/AuthContext.js` — `useAuth()`: user, profile (`users/{uid}`), signIn/signUp/signOut/updateProfile.
@@ -34,12 +36,12 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - `jobs/{id}`: title, event, eventId, leagueId, date, location, spots, hours, category, description, requirements[], perks[]
 - `users/{uid}`: displayName, displayNameLower (for search), accountType, orgStatus (orgs), faculty, bio, leagueId
 - `orgApplications/{uid}`: orgName, orgType, university, faculty, leagueId, website, socialUrl, contactName, contactRole, phone, notes, contactEmail, verificationCode, status, emailVerified, rejectReason, reviewedBy, reviewedAt
-- `owners/{uid}`: displayName, addedBy, addedAt
+- `owners/{uid}`, `testers/{uid}`: displayName, addedBy, addedAt
 - `friendships/{uidA_uidB}` (sorted): members[2], memberNames{}, requestedBy, status pending|accepted
 - `chats/{id}`: type direct|group, name (group), members[], memberNames{}, lastMessage, lastSender, updatedAt. Direct chat id: `dm_<uidA_uidB>`.
 - `chats/{id}/messages/{id}`: text, senderId, senderName, createdAt
 
-Security rules: `firestore.rules` (deploy with `npx firebase-tools deploy --only firestore:rules`). Public collections are writable only by owners. Roles are enforced there, not just in the UI.
+Security rules: `firestore.rules` (deploy with `npx firebase-tools deploy --only firestore:rules`). Public collections are writable only by staff (owners + testers). Roles are enforced there, not just in the UI.
 Avoid queries needing composite indexes — sort client-side.
 
 ## Commands

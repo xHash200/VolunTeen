@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Constants from "expo-constants";
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
@@ -8,7 +9,7 @@ import { Avatar, Badge, Button, Chips, Field } from "../components/ui";
 import { colors, common } from "../theme";
 
 export default function ProfileScreen({ navigation }) {
-  const { user, profile, displayName, isOwner, accountType, orgStatus, updateProfile, signOut } = useAuth();
+  const { user, profile, displayName, isOwner, isTester, isStaff, accountType, orgStatus, updateProfile, signOut } = useAuth();
   const { leagues, leagueById } = useData();
   const friends = useFriendships(user.uid).filter((f) => f.status === "accepted");
   const [editing, setEditing] = useState(false);
@@ -49,6 +50,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={common.meta}>{user.email}</Text>
           <View style={styles.badges}>
             {isOwner && <Badge kind="owner" />}
+            {isTester && <Badge kind="tester" />}
             <Badge kind={isOrg ? orgStatus ?? "pending" : "personal"} />
           </View>
           <Text style={common.meta}>
@@ -93,9 +95,34 @@ export default function ProfileScreen({ navigation }) {
           </View>
         )}
 
+        {isStaff && <DebugCard />}
+
         <Button title="Sign out" variant="danger" onPress={signOut} />
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+// Shown to testers and owners — handy to paste into bug reports.
+function DebugCard() {
+  const { user, accountType, orgStatus, isOwner, isTester, emailVerified } = useAuth();
+  const { source, jobs, events, leagues } = useData();
+  const rows = [
+    ["App version", `${Constants.expoConfig?.version ?? "?"} (${Constants.executionEnvironment ?? "?"})`],
+    ["Platform", `${Platform.OS} ${Platform.Version}`],
+    ["User ID", user.uid],
+    ["Account", [accountType, orgStatus, isOwner && "owner", isTester && "tester"].filter(Boolean).join(", ")],
+    ["Email verified", emailVerified ? "yes" : "no"],
+    ["Data", `${source} · ${jobs.length} jobs, ${events.length} events, ${leagues.length} leagues`],
+    ["Firebase project", process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "—"],
+  ];
+  return (
+    <View style={[common.card, { gap: 4 }]}>
+      <Text style={common.sectionTitle}>Debug info</Text>
+      <Text selectable style={styles.debug}>
+        {rows.map(([k, v]) => `${k}: ${v}`).join("\n")}
+      </Text>
+    </View>
   );
 }
 
@@ -177,5 +204,6 @@ const styles = StyleSheet.create({
   warnCard: { backgroundColor: colors.warnBg, borderColor: "#f3d9a6" },
   okCard: { backgroundColor: "#e5f6ec", borderColor: "#bfe5cd" },
   badCard: { backgroundColor: "#fdecec", borderColor: "#f5c6c6" },
+  debug: { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontSize: 12, color: colors.text, lineHeight: 18 },
   code: { fontSize: 26, fontWeight: "800", letterSpacing: 2, color: colors.text, textAlign: "center", paddingVertical: 6 },
 });

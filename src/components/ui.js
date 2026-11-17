@@ -97,6 +97,7 @@ export function Checkbox({ checked, onChange, label }) {
 
 const BADGES = {
   owner: { label: "Owner", bg: "#efe7ff", fg: "#6a3fd1" },
+  tester: { label: "Tester", bg: "#e3f4f8", fg: "#137a92" },
   verified: { label: "✓ Verified organization", bg: "#e5f6ec", fg: "#1e8a4c" },
   pending: { label: "Pending verification", bg: colors.warnBg, fg: colors.warnText },
   rejected: { label: "Verification rejected", bg: "#fdecec", fg: "#c0392b" },

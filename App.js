@@ -25,7 +25,9 @@ import NewGroupScreen from "./src/screens/chat/NewGroupScreen";
 import AddFriendScreen from "./src/screens/chat/AddFriendScreen";
 import AdminHomeScreen from "./src/screens/admin/AdminHomeScreen";
 import OrgReviewScreen from "./src/screens/admin/OrgReviewScreen";
-import AddOwnerScreen from "./src/screens/admin/AddOwnerScreen";
+import AddTeamMemberScreen from "./src/screens/admin/AddTeamMemberScreen";
+import ContentEditScreen from "./src/screens/admin/ContentEditScreen";
+import { CONTENT_TYPES } from "./src/admin/contentSchemas";
 import { colors, common } from "./src/theme";
 
 const Tab = createBottomTabNavigator();
@@ -70,7 +72,14 @@ const ProfileStack = stack([
 const AdminStack = stack([
   ["AdminHome", AdminHomeScreen, { title: "Admin" }],
   ["OrgReview", OrgReviewScreen, ({ route }) => ({ title: route.params?.title ?? "Review" })],
-  ["AddOwner", AddOwnerScreen, { title: "Add owner" }],
+  ["AddTeamMember", AddTeamMemberScreen, ({ route }) => ({ title: route.params?.role === "testers" ? "Add tester" : "Add owner" })],
+  [
+    "ContentEdit",
+    ContentEditScreen,
+    ({ route }) => ({
+      title: `${route.params?.id ? "Edit" : "New"} ${CONTENT_TYPES[route.params?.type]?.label.toLowerCase() ?? "item"}`,
+    }),
+  ],
 ]);
 
 const icons = {
@@ -83,7 +92,7 @@ const icons = {
 };
 
 function MainTabs() {
-  const { isOwner } = useAuth();
+  const { isStaff } = useAuth();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -99,7 +108,7 @@ function MainTabs() {
       <Tab.Screen name="Leagues" component={LeaguesStack} />
       <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: "Chat" }} />
       <Tab.Screen name="Profile" component={ProfileStack} />
-      {isOwner && <Tab.Screen name="Admin" component={AdminStack} />}
+      {isStaff && <Tab.Screen name="Admin" component={AdminStack} />}
     </Tab.Navigator>
   );
 }

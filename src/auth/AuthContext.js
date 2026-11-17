@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -16,6 +16,8 @@ import { auth, db } from "../firebase";
 //   organization  — users/{uid}.accountType = "organization", orgStatus pending|verified|rejected,
 //                   details in orgApplications/{uid}
 //   owner         — any account with a doc at owners/{uid} (added by another owner or in the Firebase console)
+//   tester        — any account with a doc at testers/{uid} (added by an owner). Can review organizations
+//                   and edit content, but can't manage owners/testers.
 
 const AuthContext = createContext(null);
 
@@ -34,7 +36,10 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [application, setApplication] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isTester, setIsTester] = useState(false);
   const [initializing, setInitializing] = useState(Boolean(auth));
+  // True while a sign-up is writing its own profile, so we don't create a default one at the same time.
+  const signingUp = useRef(false);
 
   useEffect(() => {
     if (!auth) return;
@@ -49,11 +54,30 @@ export function AuthProvider({ children }) {
     if (!user) {
       setProfile(null);
       setIsOwner(false);
+      setIsTester(false);
       return;
     }
     const unsubProfile = onSnapshot(
       doc(db, "users", user.uid),
-      (snap) => setProfile(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      (snap) => {
+        if (snap.exists()) return setProfile({ id: snap.id, ...snap.data() });
+        setProfile(null);
+        // Accounts created outside the app (e.g. Firebase console → Authentication → Add user)
+        // have no profile yet — create a personal one so they show up in search.
+        if (!snap.metadata.fromCache && !signingUp.current) {
+          const name = user.displayName || user.email?.split("@")[0] || "New user";
+          setDoc(doc(db, "users", user.uid), {
+            displayName: name,
+            displayNameLower: lower(name),
+            accountType: "personal",
+            faculty: "",
+            bio: "",
+            leagueId: "",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }).catch((err) => console.warn("Couldn't create profile:", err.message));
+        }
+      },
       (err) => console.warn("Profile error:", err.message)
     );
     const unsubOwner = onSnapshot(
@@ -61,9 +85,15 @@ export function AuthProvider({ children }) {
       (snap) => setIsOwner(snap.exists()),
       () => setIsOwner(false)
     );
+    const unsubTester = onSnapshot(
+      doc(db, "testers", user.uid),
+      (snap) => setIsTester(snap.exists()),
+      () => setIsTester(false)
+    );
     return () => {
       unsubProfile();
       unsubOwner();
+      unsubTester();
     };
   }, [user]);
 
@@ -81,7 +111,16 @@ export function AuthProvider({ children }) {
     );
   }, [user, accountType]);
 
-  const signUpPersonal = async (email, password, name) => {
+  const withSigningUp = (fn) => async (...args) => {
+    signingUp.current = true;
+    try {
+      return await fn(...args);
+    } finally {
+      signingUp.current = false;
+    }
+  };
+
+  const signUpPersonal = withSigningUp(async (email, password, name) => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     await setDoc(doc(db, "users", cred.user.uid), {
       displayName: name.trim(),
@@ -94,9 +133,9 @@ export function AuthProvider({ children }) {
       updatedAt: serverTimestamp(),
     });
     sendEmailVerification(cred.user).catch(() => {});
-  };
+  });
 
-  const signUpOrganization = async (email, password, org) => {
+  const signUpOrganization = withSigningUp(async (email, password, org) => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const uid = cred.user.uid;
     const batch = writeBatch(db);
@@ -122,7 +161,7 @@ export function AuthProvider({ children }) {
     });
     await batch.commit();
     sendEmailVerification(cred.user).catch(() => {});
-  };
+  });
 
   // Re-checks whether the user clicked the verification link, and records it on the org application.
   const refreshEmailVerified = async () => {
@@ -161,6 +200,9 @@ export function AuthProvider({ children }) {
     available: Boolean(auth),
     emailVerified,
     isOwner,
+    isTester,
+    // Staff = owners + testers: can review organizations and edit jobs/events/leagues.
+    isStaff: isOwner || isTester,
     accountType,
     orgStatus: profile?.orgStatus ?? null,
     isVerifiedOrg: accountType === "organization" && profile?.orgStatus === "verified",

@@ -1,18 +1,25 @@
 import { useState } from "react";
 import { Alert, FlatList, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
-import { addOwner, useOwners } from "../../admin/api";
+import { addTeamMember, ROLES, useTeam } from "../../admin/api";
 import { searchUsers } from "../../chat/api";
 import { Avatar, Button, Field } from "../../components/ui";
 import { common } from "../../theme";
 
-export default function AddOwnerScreen() {
+const DESCRIPTIONS = {
+  owners: "will have full access: verify organizations, edit content, and add or remove owners and testers.",
+  testers: "will be able to verify organizations and edit jobs, events and leagues, and will see debug info.",
+};
+
+export default function AddTeamMemberScreen({ route }) {
+  const { role } = route.params; // "owners" | "testers"
   const { user } = useAuth();
-  const owners = useOwners();
+  const members = useTeam(role);
   const [text, setText] = useState("");
   const [results, setResults] = useState([]);
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const label = ROLES[role].label.toLowerCase();
 
   const search = async () => {
     setBusy(true);
@@ -27,14 +34,10 @@ export default function AddOwnerScreen() {
   };
 
   const confirmAdd = (u) =>
-    Alert.alert(
-      "Make owner?",
-      `${u.displayName} will be able to verify organizations and add or remove other owners.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Make owner", onPress: () => addOwner(u, user.uid).catch((e) => Alert.alert("Failed", e.message)) },
-      ]
-    );
+    Alert.alert(`Make ${label}?`, `${u.displayName} ${DESCRIPTIONS[role]}`, [
+      { text: "Cancel", style: "cancel" },
+      { text: `Make ${label}`, onPress: () => addTeamMember(role, u, user.uid).catch((e) => Alert.alert("Failed", e.message)) },
+    ]);
 
   return (
     <FlatList
@@ -53,7 +56,7 @@ export default function AddOwnerScreen() {
       }
       ListEmptyComponent={searched ? <Text style={common.empty}>No one found with that name.</Text> : null}
       renderItem={({ item: u }) => {
-        const already = owners.some((o) => o.uid === u.id);
+        const already = members.some((m) => m.uid === u.id);
         return (
           <View style={[common.card, common.row]}>
             <Avatar name={u.displayName} />
@@ -61,7 +64,11 @@ export default function AddOwnerScreen() {
               <Text style={common.title}>{u.displayName}</Text>
               <Text style={common.meta}>{u.accountType === "organization" ? "Organization" : "Personal"}</Text>
             </View>
-            {already ? <Text style={common.meta}>Owner</Text> : <Button small title="Make owner" onPress={() => confirmAdd(u)} />}
+            {already ? (
+              <Text style={common.meta}>{ROLES[role].label}</Text>
+            ) : (
+              <Button small title={`Make ${label}`} onPress={() => confirmAdd(u)} />
+            )}
           </View>
         );
       }}

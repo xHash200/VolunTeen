@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 
 const millis = (ts) => ts?.toMillis?.() ?? Date.now();
@@ -50,25 +50,54 @@ async function reviewOrg(uid, reviewerUid, status, rejectReason = "") {
 export const approveOrg = (uid, reviewerUid) => reviewOrg(uid, reviewerUid, "verified");
 export const rejectOrg = (uid, reviewerUid, reason) => reviewOrg(uid, reviewerUid, "rejected", reason.trim());
 
-export function useOwners() {
+// ---------- Team (owners + testers) ----------
+
+export const ROLES = {
+  owners: { label: "Owner", plural: "Owners" },
+  testers: { label: "Tester", plural: "Testers" },
+};
+
+// role: "owners" | "testers" (the Firestore collection name)
+export function useTeam(role) {
   const [items, setItems] = useState([]);
   useEffect(
     () =>
       onSnapshot(
-        collection(db, "owners"),
-        (snap) => setItems(snap.docs.map((d) => ({ uid: d.id, ...d.data() }))),
-        (err) => console.warn("Owners error:", err.message)
+        collection(db, role),
+        (snap) =>
+          setItems(
+            snap.docs.map((d) => {
+              const data = d.data();
+              // Accept "DisplayName" too, in case it was typed that way in the Firebase console.
+              return { uid: d.id, ...data, displayName: data.displayName ?? data.DisplayName ?? "" };
+            })
+          ),
+        (err) => console.warn(`${role} error:`, err.message)
       ),
-    []
+    [role]
   );
   return items;
 }
 
-export const addOwner = (target, me) =>
-  setDoc(doc(db, "owners", target.id), {
+export const addTeamMember = (role, target, me) =>
+  setDoc(doc(db, role, target.id), {
     displayName: target.displayName ?? "",
     addedBy: me,
     addedAt: serverTimestamp(),
   });
 
-export const removeOwner = (uid) => deleteDoc(doc(db, "owners", uid));
+export const removeTeamMember = (role, uid) => deleteDoc(doc(db, role, uid));
+
+// ---------- Content (jobs / events / leagues) ----------
+
+export async function saveContent(collectionName, id, data) {
+  const payload = { ...data, updatedAt: serverTimestamp() };
+  if (id) {
+    await setDoc(doc(db, collectionName, id), payload, { merge: true });
+    return id;
+  }
+  const ref = await addDoc(collection(db, collectionName), { ...payload, createdAt: serverTimestamp() });
+  return ref.id;
+}
+
+export const deleteContent = (collectionName, id) => deleteDoc(doc(db, collectionName, id));
