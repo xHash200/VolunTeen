@@ -1,7 +1,7 @@
 // Sample data. Leagues marked `verified: false` are placeholders —
 // confirm names, faculties and links before publishing.
 
-const LEAGUES = [
+export const LEAGUES = [
   {
     id: "lsac",
     name: "LSAC Timișoara",
@@ -44,7 +44,7 @@ const LEAGUES = [
   },
 ];
 
-const JOBS = [
+export const JOBS = [
   {
     id: 1,
     title: "Registration desk volunteer",
