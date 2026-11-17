@@ -42,4 +42,17 @@ export const common = StyleSheet.create({
     overflow: "hidden",
   },
   empty: { textAlign: "center", color: colors.muted, marginTop: 32 },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.text,
+    backgroundColor: colors.card,
+  },
+  label: { fontSize: 13, fontWeight: "600", color: colors.muted, marginTop: 8 },
+  sectionTitle: { fontSize: 13, fontWeight: "700", color: colors.muted, textTransform: "uppercase", marginTop: 8 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

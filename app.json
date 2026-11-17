@@ -28,6 +28,9 @@
         "projectId": "76b67244-4399-47a8-906b-7ca8e27a2373"
       }
     },
-    "owner": "dvmi"
+    "owner": "dvmi",
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

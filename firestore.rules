@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function isOwner() { return signedIn() && exists(/databases/$(database)/documents/owners/$(request.auth.uid)); }
+    function isMember(data) { return signedIn() && request.auth.uid in data.members; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // Public content — readable by anyone, editable by owners (or in the Firebase console).
+    match /leagues/{id} { allow read: if true; allow write: if isOwner(); }
+    match /events/{id}  { allow read: if true; allow write: if isOwner(); }
+    match /jobs/{id}    { allow read: if true; allow write: if isOwner(); }
+
+    // Owners: the first owner must be added in the Firebase console (doc id = their auth UID).
+    match /owners/{uid} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    // Profiles. accountType can never change; orgStatus is set by owners
+    // (the org itself may only move it from rejected back to pending when resubmitting).
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid) && (
+        (request.resource.data.accountType == 'personal' && !('orgStatus' in request.resource.data)) ||
+        (request.resource.data.accountType == 'organization' && request.resource.data.orgStatus == 'pending')
+      );
+      allow update: if
+        (isSelf(uid) && !changed().hasAny(['accountType', 'orgStatus'])) ||
+        (isSelf(uid) && !changed().hasAny(['accountType'])
+          && resource.data.orgStatus in ['pending', 'rejected']
+          && request.resource.data.orgStatus == 'pending') ||
+        (isOwner() && changed().hasOnly(['orgStatus', 'updatedAt']));
+    }
+
+    // Organization verification requests: private to the organization and owners.
+    match /orgApplications/{uid} {
+      allow read: if isSelf(uid) || isOwner();
+      allow create: if isSelf(uid)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.emailVerified == false;
+      // The org can edit while pending/rejected (always ending as pending), and can only
+      // mark its email as verified if Firebase Auth says it is.
+      allow update: if
+        (isSelf(uid)
+          && resource.data.status in ['pending', 'rejected']
+          && request.resource.data.status == 'pending'
+          && request.resource.data.verificationCode == resource.data.verificationCode
+          && (request.resource.data.emailVerified == false || request.auth.token.email_verified == true)
+          && !changed().hasAny(['reviewedBy', 'reviewedAt'])) ||
+        isOwner();
+    }
+
+    // Friendships: doc id is "<uidA>_<uidB>" (sorted).
+    match /friendships/{id} {
+      allow read: if signedIn() && (resource == null || isMember(resource.data));
+      allow create: if isMember(request.resource.data)
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.members.size() == 2;
+      // Only the person who received the request can accept it.
+      allow update: if isMember(resource.data)
+        && resource.data.requestedBy != request.auth.uid
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.members == resource.data.members;
+      allow delete: if isMember(resource.data);
+    }
+
+    // Chats (direct + group) and their messages: members only.
+    match /chats/{chatId} {
+      allow read: if signedIn() && (resource == null || isMember(resource.data));
+      allow create: if isMember(request.resource.data);
+      allow update: if isMember(resource.data);
+
+      match /messages/{messageId} {
+        allow read: if isMember(get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow create: if isMember(get(/databases/$(database)/documents/chats/$(chatId)).data)
+          && request.resource.data.senderId == request.auth.uid;
+      }
+    }
+  }
+}
