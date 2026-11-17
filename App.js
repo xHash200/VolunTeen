@@ -29,6 +29,7 @@ import AddTeamMemberScreen from "./src/screens/admin/AddTeamMemberScreen";
 import ContentEditScreen from "./src/screens/admin/ContentEditScreen";
 import ManageEventScreen from "./src/screens/admin/ManageEventScreen";
 import JobApplicantsScreen from "./src/screens/admin/JobApplicantsScreen";
+import ApplicantProfileScreen from "./src/screens/admin/ApplicantProfileScreen";
 import { CONTENT_TYPES } from "./src/admin/contentSchemas";
 import { ROLES } from "./src/admin/api";
 import { colors, common } from "./src/theme";
@@ -85,6 +86,7 @@ const AdminStack = stack([
   ["OrgReview", OrgReviewScreen, ({ route }) => ({ title: route.params?.title ?? "Review" })],
   ["ManageEvent", ManageEventScreen, ({ route }) => ({ title: route.params?.title ?? "Event" })],
   ["JobApplicants", JobApplicantsScreen, { title: "Applicants" }],
+  ["ApplicantProfile", ApplicantProfileScreen, ({ route }) => ({ title: route.params?.name ?? "Profile" })],
   ["AddTeamMember", AddTeamMemberScreen, ({ route }) => ({ title: `Add ${ROLES[route.params?.role]?.label.toLowerCase() ?? "member"}` })],
   contentEdit,
 ]);

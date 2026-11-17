@@ -30,7 +30,11 @@
     },
     "owner": "dvmi",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        { "photosPermission": "VolunTeen needs access to your photos so you can choose a profile picture." }
+      ]
     ]
   }
 }

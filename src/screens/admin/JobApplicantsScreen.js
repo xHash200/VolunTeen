@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { useData } from "../../data/DataContext";
 import { setApplicationStatus, syncAcceptedCount, useJobApplications } from "../../applications/api";
@@ -81,6 +81,10 @@ export default function JobApplicantsScreen({ route, navigation }) {
               {!list.length && <Text style={common.meta}>{emptyText}</Text>}
               {list.map((a, i) => (
                 <View key={a.id} style={[common.card, common.row]}>
+                  <Pressable
+                    style={[common.row, { flex: 1 }]}
+                    onPress={() => navigation.navigate("ApplicantProfile", { uid: a.id, name: a.name, status })}
+                  >
                   <Avatar name={a.name} size={36} />
                   <View style={{ flex: 1 }}>
                     <Text style={common.title}>
@@ -88,9 +92,12 @@ export default function JobApplicantsScreen({ route, navigation }) {
                       {a.name}
                     </Text>
                     {!!a.appliedAt?.toDate && (
-                      <Text style={[common.meta, { fontSize: 12 }]}>Applied {a.appliedAt.toDate().toLocaleDateString("ro-RO")}</Text>
-                    )}
-                  </View>
+                      <Text style={[common.meta, { fontSize: 12 }]}>
+                        Applied {a.appliedAt.toDate().toLocaleDateString("ro-RO")},{" "}
+                        {a.appliedAt.toDate().toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}
+                      </Text>
+                    )}                  </View>
+                  </Pressable>
                   <View style={{ flexDirection: "row", gap: 6 }}>
                     {status !== "accepted" && (
                       <Button small title="Accept" loading={busyId === a.id} onPress={() => accept(a)} />

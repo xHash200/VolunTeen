@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors, common } from "../theme";
 
 export function Button({ title, onPress, variant = "primary", disabled, loading, small, style }) {
@@ -33,7 +33,11 @@ export function Segmented({ options, value, onChange }) {
   );
 }
 
-export function Avatar({ name = "?", size = 40 }) {
+// `photo`: optional data/https URI (users/{uid}.photo). Falls back to initials.
+export function Avatar({ name = "?", size = 40, photo }) {
+  if (photo) {
+    return <Image source={{ uri: photo }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.accentSoft }} />;
+  }
   const initials = name
     .split(/\s+/)
     .filter(Boolean)

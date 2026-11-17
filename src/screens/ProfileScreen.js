@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Constants from "expo-constants";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { pickProfilePhoto } from "../profile/photo";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
 import { useFriendships } from "../chat/api";
@@ -42,11 +43,44 @@ export default function ProfileScreen({ navigation }) {
 
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const uploadPhoto = async () => {
+    setPhotoBusy(true);
+    try {
+      const photo = await pickProfilePhoto();
+      if (photo) await updateProfile({ photo });
+    } catch (e) {
+      Alert.alert("Couldn't set photo", e.message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+  const changePhoto = () => {
+    if (!profile?.photo) return uploadPhoto();
+    Alert.alert("Profile photo", undefined, [
+      { text: "Choose new photo", onPress: uploadPhoto },
+      {
+        text: "Remove photo",
+        style: "destructive",
+        onPress: () => updateProfile({ photo: null }).catch((e) => Alert.alert("Couldn't remove photo", e.message)),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView style={common.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={common.list} keyboardShouldPersistTaps="handled">
         <View style={[common.card, { alignItems: "center", gap: 8 }]}>
-          <Avatar name={displayName} size={72} />
+          <Pressable onPress={changePhoto} disabled={!editing || photoBusy} style={{ alignItems: "center", gap: 4 }}>
+            <View style={{ opacity: photoBusy ? 0.5 : 1 }}>
+              <Avatar name={displayName} size={88} photo={profile?.photo} />
+              {photoBusy && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.accent} />}
+            </View>
+            {editing && (
+              <Text style={{ color: colors.accent, fontSize: 13 }}>{profile?.photo ? "Change photo" : "Add photo"}</Text>
+            )}
+          </Pressable>
           <Text style={[common.title, { fontSize: 20 }]}>{displayName}</Text>
           <Text style={common.meta}>{user.email}</Text>
           <View style={styles.badges}>

@@ -1,0 +1,61 @@
+import { useEffect, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase";
+import { useData } from "../../data/DataContext";
+import { Avatar } from "../../components/ui";
+import { colors, common } from "../../theme";
+
+// Read-only public profile of a job applicant (users/{uid}), opened from JobApplicants.
+export default function ApplicantProfileScreen({ route }) {
+  const { uid, name, status } = route.params;
+  const { leagueById } = useData();
+  const [profile, setProfile] = useState(undefined);
+
+  useEffect(() => {
+    if (!db || !uid) return setProfile(null);
+    return onSnapshot(
+      doc(db, "users", uid),
+      (snap) => setProfile(snap.exists() ? snap.data() : null),
+      (err) => {
+        console.warn("Profile load error:", err.message);
+        setProfile(null);
+      }
+    );
+  }, [uid]);
+
+  const displayName = profile?.displayName || name || "Volunteer";
+  const league = leagueById[profile?.leagueId]?.name;
+  const row = (label, value) => (
+    <View style={{ gap: 2 }}>
+      <Text style={common.label}>{label}</Text>
+      <Text style={common.body}>{value || "—"}</Text>
+    </View>
+  );
+
+  return (
+    <ScrollView style={common.screen} contentContainerStyle={common.list}>
+      <View style={[common.card, { alignItems: "center", gap: 8 }]}>
+        <Avatar name={displayName} size={88} photo={profile?.photo} />
+        <Text style={[common.title, { fontSize: 20 }]}>{displayName}</Text>
+        {!!status && <Text style={[common.tag, STATUS_STYLE[status]]}>{STATUS_LABEL[status] ?? status}</Text>}
+      </View>
+      {profile === undefined && <Text style={common.meta}>Loading profile…</Text>}
+      {profile === null && <Text style={common.meta}>This person hasn't filled in a profile.</Text>}
+      {!!profile && (
+        <View style={[common.card, { gap: 4 }]}>
+          {row("Faculty / school", profile.faculty)}
+          {row("League", league)}
+          {row("About", profile.bio)}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const STATUS_LABEL = { pending: "On the waiting list", accepted: "Accepted", declined: "Declined" };
+const STATUS_STYLE = {
+  pending: { backgroundColor: colors.warnBg, color: colors.warnText, alignSelf: "center" },
+  accepted: { backgroundColor: "#e5f6ec", color: "#1e8a4c", alignSelf: "center" },
+  declined: { backgroundColor: "#fdecec", color: "#c0392b", alignSelf: "center" },
+};
