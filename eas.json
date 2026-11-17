@@ -1,0 +1,27 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "base": {
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyARoSmERInuHaAndzrrWcrORJx2CmxCmKA",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "volunteen-69ddg.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "volunteen-69ddg",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "volunteen-69ddg.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "51208863748",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:51208863748:web:896ddeef128655848fb551"
+      }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
+    },
+    "production": {
+      "extends": "base",
+      "android": { "buildType": "app-bundle" }
+    }
+  }
+}
