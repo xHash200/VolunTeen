@@ -38,8 +38,32 @@ service cloud.firestore {
       allow create: if isStaff() || (isOrganizer() && ownsEvent(request.resource.data.eventId));
       allow update: if isStaff() || (isOrganizer()
         && ownsEvent(resource.data.eventId)
-        && ownsEvent(request.resource.data.eventId));
+        && ownsEvent(request.resource.data.eventId))
+        // An accepted volunteer withdrawing frees their spot, in the same batch that deletes their application.
+        || (signedIn()
+          && changed().hasOnly(['acceptedCount'])
+          && request.resource.data.acceptedCount == resource.data.get('acceptedCount', 0) - 1
+          && get(/databases/$(database)/documents/jobs/$(id)/applications/$(request.auth.uid)).data.status == 'accepted'
+          && !existsAfter(/databases/$(database)/documents/jobs/$(id)/applications/$(request.auth.uid)));
       allow delete: if isStaff() || (isOrganizer() && ownsEvent(resource.data.eventId));
+
+      // Volunteer applications: doc id = applicant uid. Personal accounts apply (status pending);
+      // the event's creator or staff accept/decline. Applicants see only their own.
+      match /applications/{uid} {
+        function canManageJob() {
+          return isStaff() || (isOrganizer() && ownsEvent(get(/databases/$(database)/documents/jobs/$(id)).data.eventId));
+        }
+        allow read: if isSelf(uid) || canManageJob();
+        allow create: if isSelf(uid)
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'status', 'appliedAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.status == 'pending'
+          && get(/databases/$(database)/documents/users/$(uid)).data.get('accountType', 'personal') != 'organization';
+        allow update: if canManageJob()
+          && changed().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
+          && request.resource.data.status in ['pending', 'accepted', 'declined'];
+        allow delete: if isSelf(uid) || canManageJob();
+      }
     }
 
     // Owners: the first owner must be added in the Firebase console (doc id = their auth UID).

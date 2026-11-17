@@ -35,7 +35,8 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 
 - `leagues/{id}`: name, fullName, university, faculty, description, website, verified
 - `events/{id}`: title, leagueId (optional), date (YYYY-MM-DD), time, location, category, description, createdBy, organizerName
-- `jobs/{id}`: title, event, eventId, leagueId, date, location, spots, hours, category, description, requirements[], perks[], createdBy
+- `jobs/{id}`: title, event, eventId, leagueId, date, location, spots, hours, category, description, requirements[], perks[], createdBy, acceptedCount
+- `jobs/{id}/applications/{uid}`: uid, name, status pending|accepted|declined, appliedAt, reviewedBy, reviewedAt. Personal accounts only; applicants read their own, event creator/staff manage (`src/applications/api.js`, Admin → event → role → JobApplicants).
 - `users/{uid}`: displayName, displayNameLower (for search), accountType, orgStatus (orgs), faculty, bio, leagueId
 - `orgApplications/{uid}`: orgName, orgType, university, faculty, leagueId, website, socialUrl, contactName, contactRole, phone, notes, contactEmail, verificationCode, status, emailVerified, rejectReason, reviewedBy, reviewedAt
 - `owners/{uid}`, `testers/{uid}`, `organizers/{uid}`: displayName, addedBy, addedAt

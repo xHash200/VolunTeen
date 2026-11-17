@@ -51,12 +51,12 @@ export default function ManageEventScreen({ route, navigation }) {
       />
       {roles.length === 0 && <Text style={common.meta}>No roles yet. Add the volunteers you need for this event.</Text>}
       {roles.map((j) => (
-        <Pressable key={j.id} style={common.card} onPress={() => navigation.navigate("ContentEdit", { type: "jobs", id: j.id })}>
+        <Pressable key={j.id} style={common.card} onPress={() => navigation.navigate("JobApplicants", { jobId: j.id })}>
           <Text style={common.title}>{j.title}</Text>
           <Text style={common.meta}>
-            {[j.hours, `${j.spots ?? 0} spots`, j.category].filter(Boolean).join(" · ")}
+            {[j.hours, `${Number(j.acceptedCount) || 0}/${j.spots ?? 0} spots filled`, j.category].filter(Boolean).join(" · ")}
           </Text>
-          <Text style={{ color: colors.accent, fontSize: 13 }}>Tap to edit</Text>
+          <Text style={{ color: colors.accent, fontSize: 13 }}>Tap to see applicants & edit</Text>
         </Pressable>
       ))}
     </ScrollView>
