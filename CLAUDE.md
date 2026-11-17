@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project
 
-VolunTeen — early-stage project (currently only README and MIT LICENSE). Update this file as the stack, structure, and commands are established.
+VolunTeen — web app listing volunteer "jobs" at events, organized by Timișoara faculty student leagues. Plain HTML/CSS/JS, no build step (Node is not installed on the dev machine).
 
 ## Conventions
 
@@ -13,4 +13,4 @@ VolunTeen — early-stage project (currently only README and MIT LICENSE). Updat
 
 ## Commands
 
-_None yet. Add build, run, and test commands here once they exist._
+Open `index.html` in a browser. Data lives in `data.js` (`LEAGUES`, `JOBS`); UI logic in `app.js`.
