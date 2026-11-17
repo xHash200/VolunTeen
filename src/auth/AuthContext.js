@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { forgetAccount, getSavedCredentials, saveAccount, updateSavedAccountInfo } from "./savedAccounts";
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -121,6 +122,13 @@ export function AuthProvider({ children }) {
     );
   }, [user, accountType]);
 
+  // Keep the account switcher's name/type labels current.
+  useEffect(() => {
+    if (user && profile) {
+      updateSavedAccountInfo(user.uid, { name: profile.displayName || user.email, type: profile.accountType ?? "personal" });
+    }
+  }, [user, profile?.displayName, profile?.accountType]);
+
   const withSigningUp = (fn) => async (...args) => {
     signingUp.current = true;
     try {
@@ -132,6 +140,7 @@ export function AuthProvider({ children }) {
 
   const signUpPersonal = withSigningUp(async (email, password, name) => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    saveAccount({ uid: cred.user.uid, email: email.trim(), password });
     await setDoc(doc(db, "users", cred.user.uid), {
       displayName: name.trim(),
       displayNameLower: lower(name),
@@ -148,6 +157,7 @@ export function AuthProvider({ children }) {
   const signUpOrganization = withSigningUp(async (email, password, org) => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const uid = cred.user.uid;
+    saveAccount({ uid, email: email.trim(), password });
     const batch = writeBatch(db);
     batch.set(doc(db, "users", uid), {
       displayName: org.orgName.trim(),
@@ -227,7 +237,26 @@ export function AuthProvider({ children }) {
     orgStatus: profile?.orgStatus ?? null,
     isVerifiedOrg,
     displayName: profile?.displayName || user?.email?.split("@")[0] || "",
-    signIn: (email, password) => signInWithEmailAndPassword(auth, email.trim(), password),
+    signIn: async (email, password) => {
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      saveAccount({ uid: cred.user.uid, email: email.trim(), password });
+      return cred;
+    },
+    // One-tap switch to an account remembered on this device (see savedAccounts.js).
+    // Signing in replaces the current user directly, so there's no signed-out flash.
+    switchAccount: async (uid) => {
+      const creds = await getSavedCredentials(uid);
+      if (!creds) throw new Error("This account's password isn't saved anymore. Sign in to it again.");
+      try {
+        await signInWithEmailAndPassword(auth, creds.email, creds.password);
+      } catch (e) {
+        if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found"].includes(e.code)) {
+          await forgetAccount(uid);
+          throw new Error("The saved password no longer works, so this account was removed from the list. Sign in to it again.");
+        }
+        throw e;
+      }
+    },
     signUpPersonal,
     signUpOrganization,
     resubmitApplication,

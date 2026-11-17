@@ -133,7 +133,10 @@ export default function ProfileScreen({ navigation }) {
 
         {isStaff && <DebugCard />}
 
-        <Button title="Sign out" variant="danger" onPress={signOut} />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Button title="Switch account" variant="secondary" onPress={() => navigation.navigate("SwitchAccount")} style={{ flex: 1 }} />
+          <Button title="Sign out" variant="danger" onPress={signOut} style={{ flex: 1 }} />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

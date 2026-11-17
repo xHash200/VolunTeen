@@ -28,6 +28,7 @@ import OrgReviewScreen from "./src/screens/admin/OrgReviewScreen";
 import AddTeamMemberScreen from "./src/screens/admin/AddTeamMemberScreen";
 import ContentEditScreen from "./src/screens/admin/ContentEditScreen";
 import ManageEventScreen from "./src/screens/admin/ManageEventScreen";
+import SwitchAccountScreen from "./src/screens/SwitchAccountScreen";
 import JobApplicantsScreen from "./src/screens/admin/JobApplicantsScreen";
 import ApplicantProfileScreen from "./src/screens/admin/ApplicantProfileScreen";
 import { CONTENT_TYPES } from "./src/admin/contentSchemas";
@@ -80,6 +81,7 @@ const ChatStack = stack([
 const ProfileStack = stack([
   ["ProfileHome", ProfileScreen, { title: "Profile" }],
   ["ResubmitOrg", ResubmitOrgScreen, { title: "Organization details" }],
+  ["SwitchAccount", SwitchAccountScreen, { title: "Switch account" }],
 ]);
 const AdminStack = stack([
   ["AdminHome", AdminHomeScreen, { title: "Admin" }],
