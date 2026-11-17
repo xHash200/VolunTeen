@@ -4,7 +4,7 @@ import { useData } from "../data/DataContext";
 import { colors, common, formatDate } from "../theme";
 
 export default function JobsScreen({ navigation, route }) {
-  const { jobs, leagues, leagueById, loading } = useData();
+  const { jobs, leagues, leagueById, eventById, loading } = useData();
   const [query, setQuery] = useState("");
   const leagueFilter = route.params?.leagueId ?? "";
   const setLeagueFilter = (id) => navigation.setParams({ leagueId: id });
@@ -58,7 +58,7 @@ export default function JobsScreen({ navigation, route }) {
               {formatDate(j.date)} · {j.hours} · {j.location}
             </Text>
             <Text style={common.meta}>
-              {leagueById[j.leagueId]?.name ?? ""} · {j.spots} spots
+              {leagueById[j.leagueId]?.name || eventById[j.eventId]?.organizerName || ""} · {j.spots} spots
             </Text>
           </Pressable>
         )}

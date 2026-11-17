@@ -9,7 +9,8 @@ import { Avatar, Badge, Button, Chips, Field } from "../components/ui";
 import { colors, common } from "../theme";
 
 export default function ProfileScreen({ navigation }) {
-  const { user, profile, displayName, isOwner, isTester, isStaff, accountType, orgStatus, updateProfile, signOut } = useAuth();
+  const { user, profile, displayName, isOwner, isTester, isOrganizer, isStaff, accountType, orgStatus, updateProfile, signOut } =
+    useAuth();
   const { leagues, leagueById } = useData();
   const friends = useFriendships(user.uid).filter((f) => f.status === "accepted");
   const [editing, setEditing] = useState(false);
@@ -51,6 +52,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.badges}>
             {isOwner && <Badge kind="owner" />}
             {isTester && <Badge kind="tester" />}
+            {isOrganizer && <Badge kind="organizer" />}
             <Badge kind={isOrg ? orgStatus ?? "pending" : "personal"} />
           </View>
           <Text style={common.meta}>
@@ -105,13 +107,14 @@ export default function ProfileScreen({ navigation }) {
 
 // Shown to testers and owners — handy to paste into bug reports.
 function DebugCard() {
-  const { user, accountType, orgStatus, isOwner, isTester, emailVerified } = useAuth();
+  const { user, accountType, orgStatus, isOwner, isTester, isOrganizer, emailVerified } = useAuth();
   const { source, jobs, events, leagues } = useData();
   const rows = [
     ["App version", `${Constants.expoConfig?.version ?? "?"} (${Constants.executionEnvironment ?? "?"})`],
     ["Platform", `${Platform.OS} ${Platform.Version}`],
     ["User ID", user.uid],
-    ["Account", [accountType, orgStatus, isOwner && "owner", isTester && "tester"].filter(Boolean).join(", ")],
+    // Most powerful role first.
+    ["Account", [isOwner && "owner", isTester && "tester", isOrganizer && "organizer", accountType, orgStatus].filter(Boolean).join(", ")],
     ["Email verified", emailVerified ? "yes" : "no"],
     ["Data", `${source} · ${jobs.length} jobs, ${events.length} events, ${leagues.length} leagues`],
     ["Firebase project", process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "—"],
@@ -167,7 +170,9 @@ function OrgStatusCard({ navigation }) {
     return (
       <View style={[common.card, styles.okCard]}>
         <Text style={common.title}>Your organization is verified ✓</Text>
-        <Text style={common.body}>Volunteers can see your organization as verified.</Text>
+        <Text style={common.body}>
+          Volunteers can see your organization as verified. You can now create events and post volunteer roles in the Organizer tab.
+        </Text>
       </View>
     );
 

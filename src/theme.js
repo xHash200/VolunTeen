@@ -17,6 +17,28 @@ export const formatDate = (d) => {
   return isNaN(date) ? String(d) : date.toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" });
 };
 
+// Dates are stored as ISO "YYYY-MM-DD" (sorts correctly) but typed/shown European style "DD.MM.YYYY".
+export const isoToEu = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : iso ?? "";
+};
+
+// Accepts 5.12.2026, 05/12/2026, 05-12-2026. Returns ISO string, or null if it isn't a real date.
+export const euToIso = (eu) => {
+  const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec((eu ?? "").trim());
+  if (!m) return null;
+  const [, d, mo, y] = m.map(Number);
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+};
+
+// Formats digits as DD.MM.YYYY while typing.
+export const maskEuDate = (text) => {
+  const digits = text.replace(/\D/g, "").slice(0, 8);
+  return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join(".");
+};
+
 export const common = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { padding: 16, gap: 12 },

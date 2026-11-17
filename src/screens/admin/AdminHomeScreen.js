@@ -1,27 +1,73 @@
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Alert, FlatList, Pressable, ScrollView, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { removeTeamMember, ROLES, useApplications, useTeam } from "../../admin/api";
-import { CONTENT_TYPES } from "../../admin/contentSchemas";
+import { CONTENT_TYPES, organizerOf } from "../../admin/contentSchemas";
 import { useData } from "../../data/DataContext";
 import { Avatar, Button, Chips, Segmented } from "../../components/ui";
-import { common } from "../../theme";
+import { colors, common, formatDate } from "../../theme";
 
 export default function AdminHomeScreen({ navigation }) {
-  const { isOwner } = useAuth();
-  const [tab, setTab] = useState("orgs");
+  const { isOwner, isStaff } = useAuth();
+  const [tab, setTab] = useState("events");
+  useLayoutEffect(() => navigation.setOptions({ title: isStaff ? "Admin" : "My events" }), [navigation, isStaff]);
   const tabs = [
-    { value: "orgs", label: "Organizations" },
-    { value: "content", label: "Content" },
+    { value: "events", label: "Events" },
+    ...(isStaff
+      ? [
+          { value: "orgs", label: "Orgs" },
+          { value: "content", label: "Content" },
+        ]
+      : []),
     ...(isOwner ? [{ value: "team", label: "Team" }] : []),
   ];
   return (
     <View style={common.screen}>
-      <Segmented options={tabs} value={tab} onChange={setTab} />
-      {tab === "orgs" && <OrgRequests navigation={navigation} />}
-      {tab === "content" && <Content navigation={navigation} />}
+      {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} />}
+      {tab === "events" && <ManageEvents navigation={navigation} />}
+      {tab === "orgs" && isStaff && <OrgRequests navigation={navigation} />}
+      {tab === "content" && isStaff && <Content navigation={navigation} />}
       {tab === "team" && isOwner && <Team navigation={navigation} />}
     </View>
+  );
+}
+
+// Staff see every event; organizers only the events they created.
+function ManageEvents({ navigation }) {
+  const { profile, isStaff, canEditEvent } = useAuth();
+  const { events, jobs, leagueById } = useData();
+  const mine = events.filter((e) => canEditEvent(e)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  return (
+    <FlatList
+      data={mine}
+      keyExtractor={(e) => e.id}
+      contentContainerStyle={common.list}
+      ListHeaderComponent={
+        <Button
+          title="+ Create event"
+          onPress={() => navigation.navigate("ContentEdit", { type: "events", preset: { leagueId: profile?.leagueId ?? "" } })}
+        />
+      }
+      ListEmptyComponent={
+        <Text style={common.empty}>
+          {isStaff ? "No events yet." : "You haven't created any events yet. Create one and add the volunteer roles you need."}
+        </Text>
+      }
+      renderItem={({ item: e }) => {
+        const roles = jobs.filter((j) => j.eventId === e.id);
+        const spots = roles.reduce((sum, j) => sum + (Number(j.spots) || 0), 0);
+        return (
+          <Pressable style={common.card} onPress={() => navigation.navigate("ManageEvent", { eventId: e.id, title: e.title })}>
+            <Text style={common.title}>{e.title}</Text>
+            <Text style={common.meta}>{[formatDate(e.date), organizerOf(e, leagueById)].filter(Boolean).join(" · ")}</Text>
+            <Text style={{ color: colors.accent, fontWeight: "600", marginTop: 2 }}>
+              {roles.length} role{roles.length === 1 ? "" : "s"} · {spots} spots — manage →
+            </Text>
+          </Pressable>
+        );
+      }}
+    />
   );
 }
 
@@ -72,7 +118,9 @@ function Content({ navigation }) {
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
           <Chips
-            options={Object.entries(CONTENT_TYPES).map(([value, t]) => ({ value, label: t.plural }))}
+            options={Object.entries(CONTENT_TYPES)
+              .filter(([value]) => value !== "events") // events have their own section
+              .map(([value, t]) => ({ value, label: t.plural }))}
             value={type}
             onChange={setType}
           />
@@ -95,6 +143,8 @@ function Team({ navigation }) {
     <ScrollView contentContainerStyle={common.list}>
       <TeamSection role="owners" navigation={navigation} />
       <TeamSection role="testers" navigation={navigation} />
+      <TeamSection role="organizers" navigation={navigation} />
+      <Text style={common.meta}>Verified organizations are organizers automatically.</Text>
     </ScrollView>
   );
 }

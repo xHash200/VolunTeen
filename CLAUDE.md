@@ -14,13 +14,15 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - **organization**: `accountType = "organization"`, `orgStatus` pending|verified|rejected. Details + verification code in `orgApplications/{uid}`. Verification = email confirmed + org sends the `VT-XXXXXX` code from its official page/email + owner approves in Admin tab.
 - **owner**: has a doc at `owners/{uid}`. Full Admin tab: Organizations, Content, Team (add/remove owners + testers). First owner must be created in the Firebase console.
 - **tester**: has a doc at `testers/{uid}` (added by owners in Admin → Team). Admin tab without Team: review orgs + edit jobs/events/leagues. Sees Tester badge + debug card on Profile.
-- `isStaff` (useAuth + rules) = owner or tester.
+- **organizer**: doc at `organizers/{uid}` (added by owners in Admin → Team) OR any verified organization. Gets the tab titled "Organizer" with only the Events section: create events + manage roles for events they created (`events.createdBy`). Rules check `ownsEvent()` for jobs.
+- `isStaff` (useAuth + rules) = owner or tester. `canManageEvents` = staff or organizer. `canEditEvent(event)` = staff or creator.
+- Public Events/Jobs tabs are read-only; all event management lives in the Admin/Organizer tab (Events section → ManageEvent → ContentEdit).
 - `src/config.js` — `VERIFICATION_CONTACT` (where orgs send the code), org types.
 - Logo: `assets/logo.png` (placeholder copy of icon.png — replace with the real logo).
 
 ## Structure
 
-- `App.js` — auth gate + tabs (each a stack): Jobs, Events, Leagues, Chat (ChatHome → ChatRoom / NewGroup / AddFriend), Profile (→ ResubmitOrg), Admin (staff only: AdminHome → OrgReview / ContentEdit / AddTeamMember).
+- `App.js` — auth gate + tabs (each a stack): Jobs, Events, Leagues, Chat (ChatHome → ChatRoom / NewGroup / AddFriend), Profile (→ ResubmitOrg), Admin (staff + organizers: AdminHome → ManageEvent / OrgReview / ContentEdit / AddTeamMember).
 - `src/admin/api.js` — org review, team (owners/testers), content save/delete. `src/admin/contentSchemas.js` — editor field definitions for jobs/events/leagues.
 - `src/components/OrgFields.js` — shared organization details form + validation.
 - `src/firebase.js` — app/db/auth init from `EXPO_PUBLIC_FIREBASE_*` env vars (`.env.local` locally, `eas.json` for builds). All null when unconfigured.
@@ -32,11 +34,11 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 ## Data model (Firestore)
 
 - `leagues/{id}`: name, fullName, university, faculty, description, website, verified
-- `events/{id}`: title, leagueId, date (YYYY-MM-DD), time, location, category, description
-- `jobs/{id}`: title, event, eventId, leagueId, date, location, spots, hours, category, description, requirements[], perks[]
+- `events/{id}`: title, leagueId (optional), date (YYYY-MM-DD), time, location, category, description, createdBy, organizerName
+- `jobs/{id}`: title, event, eventId, leagueId, date, location, spots, hours, category, description, requirements[], perks[], createdBy
 - `users/{uid}`: displayName, displayNameLower (for search), accountType, orgStatus (orgs), faculty, bio, leagueId
 - `orgApplications/{uid}`: orgName, orgType, university, faculty, leagueId, website, socialUrl, contactName, contactRole, phone, notes, contactEmail, verificationCode, status, emailVerified, rejectReason, reviewedBy, reviewedAt
-- `owners/{uid}`, `testers/{uid}`: displayName, addedBy, addedAt
+- `owners/{uid}`, `testers/{uid}`, `organizers/{uid}`: displayName, addedBy, addedAt
 - `friendships/{uidA_uidB}` (sorted): members[2], memberNames{}, requestedBy, status pending|accepted
 - `chats/{id}`: type direct|group, name (group), members[], memberNames{}, lastMessage, lastSender, updatedAt. Direct chat id: `dm_<uidA_uidB>`.
 - `chats/{id}/messages/{id}`: text, senderId, senderName, createdAt

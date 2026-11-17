@@ -18,6 +18,8 @@ import { auth, db } from "../firebase";
 //   owner         — any account with a doc at owners/{uid} (added by another owner or in the Firebase console)
 //   tester        — any account with a doc at testers/{uid} (added by an owner). Can review organizations
 //                   and edit content, but can't manage owners/testers.
+//   organizer     — doc at organizers/{uid} (added by an owner) OR a verified organization. Can create
+//                   events and manage volunteer roles for events they created.
 
 const AuthContext = createContext(null);
 
@@ -37,6 +39,7 @@ export function AuthProvider({ children }) {
   const [application, setApplication] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isTester, setIsTester] = useState(false);
+  const [hasOrganizerRole, setHasOrganizerRole] = useState(false);
   const [initializing, setInitializing] = useState(Boolean(auth));
   // True while a sign-up is writing its own profile, so we don't create a default one at the same time.
   const signingUp = useRef(false);
@@ -55,6 +58,7 @@ export function AuthProvider({ children }) {
       setProfile(null);
       setIsOwner(false);
       setIsTester(false);
+      setHasOrganizerRole(false);
       return;
     }
     const unsubProfile = onSnapshot(
@@ -90,10 +94,16 @@ export function AuthProvider({ children }) {
       (snap) => setIsTester(snap.exists()),
       () => setIsTester(false)
     );
+    const unsubOrganizer = onSnapshot(
+      doc(db, "organizers", user.uid),
+      (snap) => setHasOrganizerRole(snap.exists()),
+      () => setHasOrganizerRole(false)
+    );
     return () => {
       unsubProfile();
       unsubOwner();
       unsubTester();
+      unsubOrganizer();
     };
   }, [user]);
 
@@ -192,6 +202,12 @@ export function AuthProvider({ children }) {
     await batch.commit();
   };
 
+  const isStaff = isOwner || isTester;
+  const isVerifiedOrg = accountType === "organization" && profile?.orgStatus === "verified";
+  // Organizers create events and manage volunteer roles for their own events.
+  // Verified organizations are organizers automatically; owners can also grant it (organizers/{uid}).
+  const isOrganizer = hasOrganizerRole || isVerifiedOrg;
+
   const value = {
     user,
     profile,
@@ -201,11 +217,15 @@ export function AuthProvider({ children }) {
     emailVerified,
     isOwner,
     isTester,
-    // Staff = owners + testers: can review organizations and edit jobs/events/leagues.
-    isStaff: isOwner || isTester,
+    // Staff = owners + testers: can review organizations and edit all jobs/events/leagues.
+    isStaff,
+    isOrganizer,
+    canManageEvents: isStaff || isOrganizer,
+    // Staff can edit any event; organizers only the ones they created.
+    canEditEvent: (event) => Boolean(event) && (isStaff || (isOrganizer && event.createdBy === user?.uid)),
     accountType,
     orgStatus: profile?.orgStatus ?? null,
-    isVerifiedOrg: accountType === "organization" && profile?.orgStatus === "verified",
+    isVerifiedOrg,
     displayName: profile?.displayName || user?.email?.split("@")[0] || "",
     signIn: (email, password) => signInWithEmailAndPassword(auth, email.trim(), password),
     signUpPersonal,

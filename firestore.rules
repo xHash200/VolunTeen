@@ -7,13 +7,40 @@ service cloud.firestore {
     function isTester() { return signedIn() && exists(/databases/$(database)/documents/testers/$(request.auth.uid)); }
     // Staff = owners + testers: review organizations and edit content.
     function isStaff() { return isOwner() || isTester(); }
+    // Organizers: added by an owner, or any verified organization.
+    function isOrganizer() {
+      return signedIn() && (
+        exists(/databases/$(database)/documents/organizers/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('orgStatus', '') == 'verified'
+      );
+    }
+    function ownsEvent(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)).data.get('createdBy', '') == request.auth.uid;
+    }
     function isMember(data) { return signedIn() && request.auth.uid in data.members; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
-    // Public content — readable by anyone, editable by staff (or in the Firebase console).
+    // Public content — readable by anyone. Staff can edit everything;
+    // organizers can create events and manage only their own events and those events' roles.
     match /leagues/{id} { allow read: if true; allow write: if isStaff(); }
-    match /events/{id}  { allow read: if true; allow write: if isStaff(); }
-    match /jobs/{id}    { allow read: if true; allow write: if isStaff(); }
+
+    match /events/{id} {
+      allow read: if true;
+      allow create: if isStaff() || (isOrganizer() && request.resource.data.createdBy == request.auth.uid);
+      allow update: if isStaff() || (isOrganizer()
+        && resource.data.get('createdBy', '') == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid);
+      allow delete: if isStaff() || (isOrganizer() && resource.data.get('createdBy', '') == request.auth.uid);
+    }
+
+    match /jobs/{id} {
+      allow read: if true;
+      allow create: if isStaff() || (isOrganizer() && ownsEvent(request.resource.data.eventId));
+      allow update: if isStaff() || (isOrganizer()
+        && ownsEvent(resource.data.eventId)
+        && ownsEvent(request.resource.data.eventId));
+      allow delete: if isStaff() || (isOrganizer() && ownsEvent(resource.data.eventId));
+    }
 
     // Owners: the first owner must be added in the Firebase console (doc id = their auth UID).
     // Only owners can add/remove owners and testers.
@@ -22,6 +49,10 @@ service cloud.firestore {
       allow write: if isOwner();
     }
     match /testers/{uid} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+    match /organizers/{uid} {
       allow read: if signedIn();
       allow write: if isOwner();
     }

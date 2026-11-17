@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, Text } from "react-native";
+import { organizerOf } from "../admin/contentSchemas";
 import { useData } from "../data/DataContext";
 import { common, formatDate } from "../theme";
 
@@ -12,13 +13,11 @@ export default function EventDetailScreen({ route, navigation }) {
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.list}>
-      <Text style={common.tag}>{event.category}</Text>
+      {!!event.category && <Text style={common.tag}>{event.category}</Text>}
       <Text style={[common.title, { fontSize: 22 }]}>{event.title}</Text>
-      <Text style={common.meta}>
-        {formatDate(event.date)} · {event.time} · {event.location}
-      </Text>
-      <Text style={common.meta}>Organized by {leagueById[event.leagueId]?.name ?? "—"}</Text>
-      <Text style={common.body}>{event.description}</Text>
+      <Text style={common.meta}>{[formatDate(event.date), event.time, event.location].filter(Boolean).join(" · ")}</Text>
+      <Text style={common.meta}>Organized by {organizerOf(event, leagueById) || "—"}</Text>
+      {!!event.description && <Text style={common.body}>{event.description}</Text>}
 
       <Text style={common.sectionTitle}>Volunteer roles</Text>
       {roles.length === 0 && <Text style={common.meta}>No volunteer roles posted yet.</Text>}

@@ -27,7 +27,9 @@ import AdminHomeScreen from "./src/screens/admin/AdminHomeScreen";
 import OrgReviewScreen from "./src/screens/admin/OrgReviewScreen";
 import AddTeamMemberScreen from "./src/screens/admin/AddTeamMemberScreen";
 import ContentEditScreen from "./src/screens/admin/ContentEditScreen";
+import ManageEventScreen from "./src/screens/admin/ManageEventScreen";
 import { CONTENT_TYPES } from "./src/admin/contentSchemas";
+import { ROLES } from "./src/admin/api";
 import { colors, common } from "./src/theme";
 
 const Tab = createBottomTabNavigator();
@@ -57,6 +59,14 @@ const AuthStack = stack([
 ]);
 
 const JobsStack = stack([["Jobs", JobsScreen, { title: "VolunTeen" }], jobDetail]);
+const contentEdit = [
+  "ContentEdit",
+  ContentEditScreen,
+  ({ route }) => ({
+    title: `${route.params?.id ? "Edit" : "New"} ${CONTENT_TYPES[route.params?.type]?.label.toLowerCase() ?? "item"}`,
+  }),
+];
+
 const EventsStack = stack([["Events", EventsScreen], ["EventDetail", EventDetailScreen, { title: "Event" }], jobDetail]);
 const LeaguesStack = stack([["LeaguesList", LeaguesScreen, { title: "Leagues" }]]);
 const ChatStack = stack([
@@ -72,14 +82,9 @@ const ProfileStack = stack([
 const AdminStack = stack([
   ["AdminHome", AdminHomeScreen, { title: "Admin" }],
   ["OrgReview", OrgReviewScreen, ({ route }) => ({ title: route.params?.title ?? "Review" })],
-  ["AddTeamMember", AddTeamMemberScreen, ({ route }) => ({ title: route.params?.role === "testers" ? "Add tester" : "Add owner" })],
-  [
-    "ContentEdit",
-    ContentEditScreen,
-    ({ route }) => ({
-      title: `${route.params?.id ? "Edit" : "New"} ${CONTENT_TYPES[route.params?.type]?.label.toLowerCase() ?? "item"}`,
-    }),
-  ],
+  ["ManageEvent", ManageEventScreen, ({ route }) => ({ title: route.params?.title ?? "Event" })],
+  ["AddTeamMember", AddTeamMemberScreen, ({ route }) => ({ title: `Add ${ROLES[route.params?.role]?.label.toLowerCase() ?? "member"}` })],
+  contentEdit,
 ]);
 
 const icons = {
@@ -92,7 +97,7 @@ const icons = {
 };
 
 function MainTabs() {
-  const { isStaff } = useAuth();
+  const { isStaff, canManageEvents } = useAuth();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -108,7 +113,7 @@ function MainTabs() {
       <Tab.Screen name="Leagues" component={LeaguesStack} />
       <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: "Chat" }} />
       <Tab.Screen name="Profile" component={ProfileStack} />
-      {isStaff && <Tab.Screen name="Admin" component={AdminStack} />}
+      {canManageEvents && <Tab.Screen name="Admin" component={AdminStack} options={{ title: isStaff ? "Admin" : "Organizer" }} />}
     </Tab.Navigator>
   );
 }

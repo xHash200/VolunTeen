@@ -9,10 +9,11 @@ import { common } from "../../theme";
 const DESCRIPTIONS = {
   owners: "will have full access: verify organizations, edit content, and add or remove owners and testers.",
   testers: "will be able to verify organizations and edit jobs, events and leagues, and will see debug info.",
+  organizers: "will be able to create events and manage the volunteer roles for their own events.",
 };
 
 export default function AddTeamMemberScreen({ route }) {
-  const { role } = route.params; // "owners" | "testers"
+  const { role } = route.params; // "owners" | "testers" | "organizers"
   const { user } = useAuth();
   const members = useTeam(role);
   const [text, setText] = useState("");

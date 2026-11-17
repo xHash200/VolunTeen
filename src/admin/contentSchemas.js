@@ -1,12 +1,14 @@
+import { isoToEu } from "../theme";
+
 // Field definitions for the in-app content editor (owners + testers).
-// Field types: text, multiline, number, date (YYYY-MM-DD), list (one item per line), bool, league, event.
+// Field types: text, multiline, number, date (typed DD.MM.YYYY, stored YYYY-MM-DD), list (one item per line), bool, league, event.
 
 export const CONTENT_TYPES = {
   jobs: {
     label: "Job",
     plural: "Jobs",
     titleKey: "title",
-    subtitle: (j, { eventById }) => [eventById[j.eventId]?.title ?? j.event, j.date].filter(Boolean).join(" · "),
+    subtitle: (j, { eventById }) => [eventById[j.eventId]?.title ?? j.event, isoToEu(j.date)].filter(Boolean).join(" · "),
     fields: [
       { key: "title", label: "Job title", type: "text", required: true, placeholder: "e.g. Registration desk volunteer" },
       { key: "eventId", label: "Event", type: "event", required: true },
@@ -24,10 +26,10 @@ export const CONTENT_TYPES = {
     label: "Event",
     plural: "Events",
     titleKey: "title",
-    subtitle: (e, { leagueById }) => [leagueById[e.leagueId]?.name, e.date].filter(Boolean).join(" · "),
+    subtitle: (e, { leagueById }) => [organizerOf(e, leagueById), isoToEu(e.date)].filter(Boolean).join(" · "),
     fields: [
       { key: "title", label: "Event name", type: "text", required: true },
-      { key: "leagueId", label: "Organized by", type: "league", required: true },
+      { key: "leagueId", label: "League (optional)", type: "league" },
       { key: "category", label: "Category", type: "text", placeholder: "e.g. Career, Education, Social, Charity" },
       { key: "date", label: "Date", type: "date", required: true },
       { key: "time", label: "Time", type: "text", placeholder: "e.g. 09:00–17:00" },
@@ -51,6 +53,9 @@ export const CONTENT_TYPES = {
     ],
   },
 };
+
+// Who runs an event: its league if it has one, otherwise the organizer who created it.
+export const organizerOf = (event, leagueById) => leagueById[event?.leagueId]?.name || event?.organizerName || "";
 
 export function emptyFor(type) {
   return Object.fromEntries(

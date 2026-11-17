@@ -3,12 +3,12 @@ import { useData } from "../data/DataContext";
 import { common, formatDate } from "../theme";
 
 export default function JobDetailScreen({ route }) {
-  const { jobs, leagueById } = useData();
+  const { jobs, leagueById, eventById } = useData();
   const job = jobs.find((j) => String(j.id) === String(route.params.jobId));
 
   if (!job) return <Text style={common.empty}>This job is no longer available.</Text>;
 
-  const league = leagueById[job.leagueId];
+  const organizer = leagueById[job.leagueId]?.name || eventById[job.eventId]?.organizerName || "—";
   const section = (title, items = []) =>
     items.length > 0 && (
       <>
@@ -24,7 +24,7 @@ export default function JobDetailScreen({ route }) {
       <Text style={common.tag}>{job.category}</Text>
       <Text style={[common.title, { fontSize: 22 }]}>{job.title}</Text>
       <Text style={common.meta}>
-        {job.event} · organized by {league?.name ?? "—"}
+        {job.event} · organized by {organizer}
       </Text>
       <Text style={common.meta}>
         {formatDate(job.date)} · {job.hours} · {job.location} · {job.spots} spots

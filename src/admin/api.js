@@ -55,9 +55,10 @@ export const rejectOrg = (uid, reviewerUid, reason) => reviewOrg(uid, reviewerUi
 export const ROLES = {
   owners: { label: "Owner", plural: "Owners" },
   testers: { label: "Tester", plural: "Testers" },
+  organizers: { label: "Organizer", plural: "Organizers" },
 };
 
-// role: "owners" | "testers" (the Firestore collection name)
+// role: "owners" | "testers" | "organizers" (the Firestore collection name)
 export function useTeam(role) {
   const [items, setItems] = useState([]);
   useEffect(
@@ -90,14 +91,28 @@ export const removeTeamMember = (role, uid) => deleteDoc(doc(db, role, uid));
 
 // ---------- Content (jobs / events / leagues) ----------
 
-export async function saveContent(collectionName, id, data) {
+// `creator` ({ uid, name }) is recorded on new items; organizers may only edit items they created.
+export async function saveContent(collectionName, id, data, creator) {
   const payload = { ...data, updatedAt: serverTimestamp() };
   if (id) {
     await setDoc(doc(db, collectionName, id), payload, { merge: true });
     return id;
   }
-  const ref = await addDoc(collection(db, collectionName), { ...payload, createdAt: serverTimestamp() });
+  const ref = await addDoc(collection(db, collectionName), {
+    ...payload,
+    createdBy: creator.uid,
+    ...(collectionName === "events" ? { organizerName: creator.name } : {}),
+    createdAt: serverTimestamp(),
+  });
   return ref.id;
 }
 
 export const deleteContent = (collectionName, id) => deleteDoc(doc(db, collectionName, id));
+
+// Deletes an event together with all of its volunteer roles.
+export async function deleteEventWithRoles(eventId, jobIds) {
+  const batch = writeBatch(db);
+  jobIds.forEach((jobId) => batch.delete(doc(db, "jobs", String(jobId))));
+  batch.delete(doc(db, "events", eventId));
+  await batch.commit();
+}
