@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import {
   addDoc,
+  arrayRemove,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -120,6 +122,27 @@ export function useMessages(chatId) {
     [chatId]
   );
 }
+
+// One chat, live. undefined = loading, null = missing or no access.
+export function useChat(chatId) {
+  const [chat, setChat] = useState(undefined);
+  useEffect(() => {
+    if (!chatId) return setChat(null);
+    return onSnapshot(
+      doc(db, "chats", chatId),
+      (snap) => setChat(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      () => setChat(null)
+    );
+  }, [chatId]);
+  return chat;
+}
+
+// Group chats only (team chats have no member list).
+export const leaveGroup = (chatId, uid) =>
+  updateDoc(doc(db, "chats", chatId), { members: arrayRemove(uid), [`memberNames.${uid}`]: deleteField() });
+
+export const setGroupDescription = (chatId, description) =>
+  updateDoc(doc(db, "chats", chatId), { description: description.trim().slice(0, 300) });
 
 export async function openDirectChat(me, myName, friend) {
   const id = directChatId(me, friend.id);

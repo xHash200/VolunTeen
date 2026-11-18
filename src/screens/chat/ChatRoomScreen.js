@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
 import { sendMessage, useMessages } from "../../chat/api";
 import { colors, common, themed } from "../../theme";
@@ -11,13 +11,27 @@ const timeOf = (ts) => {
   return d ? d.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }) : "";
 };
 
-export default function ChatRoomScreen({ route }) {
+export default function ChatRoomScreen({ route, navigation }) {
   const { chatId } = route.params;
   const { user, displayName } = useAuth();
+  // ⋮ → Group info (members, roles, description). Group and team chats only, not direct messages.
+  useLayoutEffect(() => {
+    if (chatId.startsWith("dm_")) return;
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={() => navigation.navigate("ChatInfo", { chatId })}
+          hitSlop={12}
+          accessibilityLabel="Group info"
+        >
+          <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, chatId]);
   const messages = useMessages(chatId);
   const [text, setText] = useState("");
   const headerHeight = useHeaderHeight();
-  const insets = useSafeAreaInsets();
 
   const send = () => {
     const body = text;
@@ -33,12 +47,18 @@ export default function ChatRoomScreen({ route }) {
 
   return (
     <KeyboardAvoidingView style={common.screen} behavior="padding" keyboardVerticalOffset={headerHeight}>
+      {/* Empty state lives outside the inverted list: whether RN flips an inverted list's
+          ListEmptyComponent differs between versions, so it could show upside down. */}
+      {data.length === 0 && (
+        <View style={styles.empty} pointerEvents="none">
+          <Text style={common.empty}>Say hi 👋</Text>
+        </View>
+      )}
       <FlatList
         inverted
         data={data}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: 12, gap: 6 }}
-        ListEmptyComponent={<Text style={[common.empty, { transform: [{ scaleY: -1 }] }]}>Say hi 👋</Text>}
         renderItem={({ item: m, index }) => {
           const mine = m.senderId === user.uid;
           const showName = !mine && data[index + 1]?.senderId !== m.senderId;
@@ -51,7 +71,8 @@ export default function ChatRoomScreen({ route }) {
           );
         }}
       />
-      <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
+      {/* No bottom safe-area padding: the tab bar below already covers the phone's bottom edge. */}
+      <View style={styles.composer}>
         <TextInput
           style={[common.input, { flex: 1, maxHeight: 120 }]}
           value={text}
@@ -69,6 +90,7 @@ export default function ChatRoomScreen({ route }) {
 }
 
 const styles = themed((colors) => StyleSheet.create({
+  empty: { ...StyleSheet.absoluteFillObject, bottom: 70, alignItems: "center", justifyContent: "center" },
   bubble: { maxWidth: "80%", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
   mine: { alignSelf: "flex-end", backgroundColor: colors.accent, borderBottomRightRadius: 4 },
   theirs: { alignSelf: "flex-start", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
@@ -80,7 +102,7 @@ const styles = themed((colors) => StyleSheet.create({
     alignItems: "flex-end",
     gap: 8,
     paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingVertical: 8,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderColor: colors.border,

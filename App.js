@@ -21,6 +21,7 @@ import ProfileScreen from "./src/screens/ProfileScreen";
 import ResubmitOrgScreen from "./src/screens/ResubmitOrgScreen";
 import ChatHomeScreen from "./src/screens/chat/ChatHomeScreen";
 import ChatRoomScreen from "./src/screens/chat/ChatRoomScreen";
+import ChatInfoScreen from "./src/screens/chat/ChatInfoScreen";
 import NewGroupScreen from "./src/screens/chat/NewGroupScreen";
 import AddFriendScreen from "./src/screens/chat/AddFriendScreen";
 import AdminHomeScreen from "./src/screens/admin/AdminHomeScreen";
@@ -85,7 +86,8 @@ const EventsStack = stack([["Events", EventsScreen], ["EventDetail", EventDetail
 const LeaguesStack = stack([["LeaguesList", LeaguesScreen, { title: "Leagues" }]]);
 const ChatStack = stack([
   ["ChatHome", ChatHomeScreen, { title: "Chat" }],
-  ["ChatRoom", ChatRoomScreen, ({ route }) => ({ title: route.params?.title ?? "Chat" })],
+  ["ChatRoom", ChatRoomScreen, ({ route }) => ({ title: route.params?.title ?? "Chat", headerTitleAlign: "center" })],
+  ["ChatInfo", ChatInfoScreen, { title: "Group info", headerTitleAlign: "center" }],
   ["NewGroup", NewGroupScreen, { title: "New group" }],
   ["AddFriend", AddFriendScreen, { title: "Add friend" }],
 ]);
