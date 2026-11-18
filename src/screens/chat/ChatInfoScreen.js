@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../auth/AuthContext";
@@ -7,7 +8,7 @@ import { leaveGroup, setGroupDescription, TEAM_CHATS, useChat } from "../../chat
 import { useTeam } from "../../admin/api";
 import { RoleTag, useRoleTagOf } from "../../components/RoleTag";
 import { Avatar, Badge, Button, Field } from "../../components/ui";
-import { common, formatDate } from "../../theme";
+import { colors, common, formatDate } from "../../theme";
 
 // "Group info" (⋮ in a group or team chat): description, details and every member with their role.
 
@@ -133,7 +134,13 @@ export default function ChatInfoScreen({ route, navigation }) {
 
       <Text style={common.sectionTitle}>Members ({members.length})</Text>
       {members.map((m) => (
-        <MemberRow key={m.uid} member={m} isMe={m.uid === user.uid} isCreator={!team && m.uid === chat.createdBy} />
+        <MemberRow
+          key={m.uid}
+          member={m}
+          isMe={m.uid === user.uid}
+          isCreator={!team && m.uid === chat.createdBy}
+          onPress={(name) => navigation.navigate("UserProfile", { uid: m.uid, name })}
+        />
       ))}
 
       {!team && <Button variant="danger" title="Leave group" onPress={confirmLeave} style={{ marginTop: 8 }} />}
@@ -141,7 +148,8 @@ export default function ChatInfoScreen({ route, navigation }) {
   );
 }
 
-function MemberRow({ member, isMe, isCreator }) {
+// Tap a member to open their public profile.
+function MemberRow({ member, isMe, isCreator, onPress }) {
   const [profile, setProfile] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -159,7 +167,12 @@ function MemberRow({ member, isMe, isCreator }) {
   const label = ROLE_LABEL[kind] ?? (profile?.accountType === "organization" ? "Organization (not verified)" : "Member");
 
   return (
-    <View style={[common.card, common.row]}>
+    <Pressable
+      style={({ pressed }) => [common.card, common.row, pressed && { opacity: 0.7 }]}
+      onPress={() => onPress(name)}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${name}'s profile`}
+    >
       <Avatar name={name} photo={profile?.photo} />
       <View style={{ flex: 1 }}>
         <Text style={common.title} numberOfLines={1}>
@@ -173,6 +186,7 @@ function MemberRow({ member, isMe, isCreator }) {
         </Text>
       </View>
       {!!kind && <Badge kind={kind} />}
-    </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+    </Pressable>
   );
 }

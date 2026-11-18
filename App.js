@@ -88,6 +88,7 @@ const ChatStack = stack([
   ["ChatHome", ChatHomeScreen, { title: "Chat" }],
   ["ChatRoom", ChatRoomScreen, ({ route }) => ({ title: route.params?.title ?? "Chat", headerTitleAlign: "center" })],
   ["ChatInfo", ChatInfoScreen, { title: "Group info", headerTitleAlign: "center" }],
+  ["UserProfile", ApplicantProfileScreen, ({ route }) => ({ title: route.params?.name ?? "Profile", headerTitleAlign: "center" })],
   ["NewGroup", NewGroupScreen, { title: "New group" }],
   ["AddFriend", AddFriendScreen, { title: "Add friend" }],
 ]);

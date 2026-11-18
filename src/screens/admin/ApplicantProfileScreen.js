@@ -8,7 +8,8 @@ import { RoleTag, useRoleTagOf } from "../../components/RoleTag";
 import { colors, common } from "../../theme";
 import { formatPlace } from "../../data/romania";
 
-// Read-only public profile of a job applicant (users/{uid}), opened from JobApplicants.
+// Read-only public profile (users/{uid}). Opened from JobApplicants (with status + age from the
+// application) and from Chat → Group info (just uid + name, registered there as "UserProfile").
 export default function ApplicantProfileScreen({ route }) {
   // age comes from the application (the birth date itself is private).
   const { uid, name, status, age } = route.params;
@@ -55,7 +56,7 @@ export default function ApplicantProfileScreen({ route }) {
       {profile === null && <Text style={common.meta}>This person hasn't filled in a profile.</Text>}
       {!!profile && (
         <View style={[common.card, { gap: 4 }]}>
-          {row("Age", age != null ? `${age} (when they applied)` : null)}
+          {age != null && row("Age", `${age} (when they applied)`)}
           {row("City", formatPlace(profile))}
           {row("Faculty / school", profile.faculty)}
           {row("League", league)}
