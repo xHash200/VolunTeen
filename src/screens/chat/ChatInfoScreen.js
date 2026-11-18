@@ -7,12 +7,11 @@ import { useAuth } from "../../auth/AuthContext";
 import { leaveGroup, setGroupDescription, TEAM_CHATS, useChat } from "../../chat/api";
 import { useTeam } from "../../admin/api";
 import { RoleTag, useRoleTagOf } from "../../components/RoleTag";
-import { Avatar, Badge, Button, Field } from "../../components/ui";
+import { Avatar, Button, Field } from "../../components/ui";
 import { colors, common, formatDate } from "../../theme";
 
 // "Group info" (⋮ in a group or team chat): description, details and every member with their role.
 
-const ROLE_LABEL = { owner: "Owner", admin: "Admin", tester: "Tester", organization: "Organization" };
 const ROLE_RANK = { owner: 0, admin: 1, tester: 2 };
 const dateOf = (ts) => (ts?.toDate ? formatDate(ts.toDate()) : "—");
 
@@ -138,7 +137,6 @@ export default function ChatInfoScreen({ route, navigation }) {
           key={m.uid}
           member={m}
           isMe={m.uid === user.uid}
-          isCreator={!team && m.uid === chat.createdBy}
           onPress={(name) => navigation.navigate("UserProfile", { uid: m.uid, name })}
         />
       ))}
@@ -149,7 +147,7 @@ export default function ChatInfoScreen({ route, navigation }) {
 }
 
 // Tap a member to open their public profile.
-function MemberRow({ member, isMe, isCreator, onPress }) {
+function MemberRow({ member, isMe, onPress }) {
   const [profile, setProfile] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -164,7 +162,6 @@ function MemberRow({ member, isMe, isCreator, onPress }) {
   const looked = useRoleTagOf(member.role ? null : member.uid, profile);
   const kind = member.role ?? looked;
   const name = profile?.displayName || member.name;
-  const label = ROLE_LABEL[kind] ?? (profile?.accountType === "organization" ? "Organization (not verified)" : "Member");
 
   return (
     <Pressable
@@ -174,18 +171,12 @@ function MemberRow({ member, isMe, isCreator, onPress }) {
       accessibilityLabel={`Open ${name}'s profile`}
     >
       <Avatar name={name} photo={profile?.photo} />
-      <View style={{ flex: 1 }}>
-        <Text style={common.title} numberOfLines={1}>
-          <RoleTag kind={kind} />
-          {name}
-          {isMe ? " (you)" : ""}
-        </Text>
-        <Text style={common.meta}>
-          {label}
-          {isCreator ? " · Created the group" : ""}
-        </Text>
-      </View>
-      {!!kind && <Badge kind={kind} />}
+      {/* Just the tag and the name, e.g. "[OWN] Ana (you)". */}
+      <Text style={[common.title, { flex: 1 }]} numberOfLines={1}>
+        <RoleTag kind={kind} />
+        {name}
+        {isMe ? " (you)" : ""}
+      </Text>
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />
     </Pressable>
   );
