@@ -11,16 +11,18 @@ import { citiesOf, countiesOf, COUNTRIES, formatPlace } from "../data/romania";
 import { colors, common, themed, ageFrom, euToIso, maskEuDate } from "../theme";
 
 export default function ProfileScreen({ navigation }) {
-  const { user, profile, displayName, isOwner, isTester, isOrganizer, isStaff, accountType, orgStatus, updateProfile, signOut } =
-    useAuth();
+  const {
+    user, profile, displayName, isOwner, isTester, isStaff, accountType, orgStatus, updateProfile, signOut,
+    birthDate, privateLoaded, setBirthDate,
+  } = useAuth();
   const { leagues, leagueById } = useData();
   const friends = useFriendships(user.uid).filter((f) => f.status === "accepted");
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ displayName: "", place: {}, birth: "", faculty: "", bio: "", leagueId: "" });
   const [busy, setBusy] = useState(false);
   const isOrg = accountType === "organization";
-  const age = ageFrom(profile?.birthDate);
-  const canSetBirth = !isOrg && !profile?.birthDate;
+  const age = ageFrom(birthDate);
+  const canSetBirth = !isOrg && privateLoaded && !birthDate && !profile?.birthDate;
 
   useEffect(() => {
     setForm({
@@ -39,17 +41,18 @@ export default function ProfileScreen({ navigation }) {
     // Older accounts can add their date of birth once; after that it's locked (see firestore.rules).
     const { birth, place, ...rest } = form;
     if (!isOrg && (!place.county || !place.city)) return Alert.alert("Please select your county and city");
-    const extra = {};
+    let newBirthDate = null;
     if (canSetBirth && birth) {
       const iso = euToIso(birth);
       const a = iso && ageFrom(iso);
       if (!iso || a > 120) return Alert.alert("Please check your date of birth", "Use the format 31.12.2008.");
       if (a < MIN_AGE) return Alert.alert("Too young", `You need to be at least ${MIN_AGE} to use VolunTeen.`);
-      extra.birthDate = iso;
+      newBirthDate = iso;
     }
     setBusy(true);
     try {
-      await updateProfile({ ...rest, ...extra, displayName: form.displayName.trim(), country: place.country ?? "", county: place.county ?? "", city: place.city ?? "" });
+      if (newBirthDate) await setBirthDate(newBirthDate); // private, set once
+      await updateProfile({ ...rest, displayName: form.displayName.trim(), country: place.country ?? "", county: place.county ?? "", city: place.city ?? "" });
       setEditing(false);
     } catch (e) {
       Alert.alert("Couldn't save", e.message);

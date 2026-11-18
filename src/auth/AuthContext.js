@@ -9,7 +9,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import { collection, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 // Account types:
@@ -42,6 +42,7 @@ export function AuthProvider({ children }) {
   const [isOwner, setIsOwner] = useState(false);
   const [isTester, setIsTester] = useState(false);
   const [helperEventIds, setHelperEventIds] = useState([]);
+  const [privateInfo, setPrivateInfo] = useState(undefined);
   const [initializing, setInitializing] = useState(Boolean(auth));
   // True while a sign-up is writing its own profile, so we don't create a default one at the same time.
   const signingUp = useRef(false);
@@ -58,6 +59,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!user) {
       setProfile(null);
+      setPrivateInfo(undefined);
       setIsOwner(false);
       setIsTester(false);
       setHelperEventIds([]);
@@ -87,6 +89,12 @@ export function AuthProvider({ children }) {
       },
       (err) => console.warn("Profile error:", err.message)
     );
+    // Private part of the profile (birth date). undefined = loading, null = none.
+    const unsubPrivate = onSnapshot(
+      doc(db, "users", user.uid, "private", "profile"),
+      (snap) => setPrivateInfo(snap.exists() ? snap.data() : null),
+      () => setPrivateInfo(null)
+    );
     const unsubOwner = onSnapshot(
       doc(db, "owners", user.uid),
       (snap) => setIsOwner(snap.exists()),
@@ -104,6 +112,7 @@ export function AuthProvider({ children }) {
     );
     return () => {
       unsubProfile();
+      unsubPrivate();
       unsubOwner();
       unsubTester();
       unsubHelper();
@@ -111,6 +120,15 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   const accountType = profile?.accountType ?? "personal";
+
+  // One-time move: profiles created before the birth date went private still have it on the public doc.
+  useEffect(() => {
+    if (!user || !profile?.birthDate || privateInfo === undefined) return;
+    const batch = writeBatch(db);
+    if (!privateInfo) batch.set(doc(db, "users", user.uid, "private", "profile"), { birthDate: profile.birthDate });
+    batch.update(doc(db, "users", user.uid), { birthDate: deleteField() });
+    batch.commit().catch((e) => console.warn("Birth date move failed:", e.message));
+  }, [user, profile?.birthDate, privateInfo]);
 
   useEffect(() => {
     if (!user || accountType !== "organization") {
@@ -142,15 +160,17 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // extra: { birthDate: "YYYY-MM-DD" (permanent), country, county, city }
+  // extra: { birthDate: "YYYY-MM-DD" (permanent, private), country, county, city }
   const signUpPersonal = withSigningUp(async (email, password, name, extra = {}) => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     saveAccount({ uid: cred.user.uid, email: email.trim(), password });
-    await setDoc(doc(db, "users", cred.user.uid), {
+    // Rules require the private birth date to be written in the same batch as the profile.
+    const batch = writeBatch(db);
+    batch.set(doc(db, "users", cred.user.uid, "private", "profile"), { birthDate: extra.birthDate });
+    batch.set(doc(db, "users", cred.user.uid), {
       displayName: name.trim(),
       displayNameLower: lower(name),
       accountType: "personal",
-      birthDate: extra.birthDate ?? "",
       country: extra.country ?? "",
       county: extra.county ?? "",
       city: extra.city ?? "",
@@ -160,6 +180,7 @@ export function AuthProvider({ children }) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    await batch.commit();
     sendEmailVerification(cred.user).catch(() => {});
   });
 
@@ -245,6 +266,11 @@ export function AuthProvider({ children }) {
     helperEventIds,
     canReviewEvent: (event) =>
       Boolean(event) && (isStaff || (isOrganizer && event.createdBy === user?.uid) || helperEventIds.includes(event.id)),
+    // Private birth date ("YYYY-MM-DD"), or null if not set / still loading.
+    birthDate: privateInfo?.birthDate ?? null,
+    privateLoaded: privateInfo !== undefined,
+    // Older accounts add their birth date once (16+, then locked).
+    setBirthDate: (iso) => setDoc(doc(db, "users", user.uid, "private", "profile"), { birthDate: iso }),
     // Name of the management tab (bottom-right) and its header, by highest role.
     adminTabTitle: isOwner ? "Owner" : isTester ? "Tester" : isOrganizer ? "Organization" : "My events",
     accountType,

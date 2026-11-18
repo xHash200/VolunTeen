@@ -5,7 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { applyToJob, useMyApplication, withdrawApplication } from "../applications/api";
 import { db } from "../firebase";
 import { Button } from "../components/ui";
-import { colors, common, formatDate } from "../theme";
+import { ageFrom, colors, common, formatDate } from "../theme";
 
 export default function JobDetailScreen({ route }) {
   const { jobs, leagueById, eventById } = useData();
@@ -55,7 +55,7 @@ const STATUS = {
 };
 
 function ApplyBox({ job, full }) {
-  const { user, displayName, accountType } = useAuth();
+  const { user, displayName, accountType, birthDate } = useAuth();
   const app = useMyApplication(job.id, user?.uid);
   const [busy, setBusy] = useState(false);
 
@@ -78,7 +78,7 @@ function ApplyBox({ job, full }) {
   if (!app) {
     return (
       <View style={{ gap: 6, marginTop: 8 }}>
-        <Button title="Apply" loading={busy} onPress={() => run(() => applyToJob(job.id, user.uid, displayName))} />
+        <Button title="Apply" loading={busy} onPress={() => run(() => applyToJob(job.id, user.uid, displayName, birthDate ? ageFrom(birthDate) : null))} />
         <Text style={common.meta}>
           {full
             ? "All spots are filled, but you can still join the waiting list in case someone drops out."

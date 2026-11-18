@@ -35,6 +35,7 @@ import { CONTENT_TYPES } from "./src/admin/contentSchemas";
 import { ROLES } from "./src/admin/api";
 import { colors, common, ThemeProvider, useTheme } from "./src/theme";
 import SettingsScreen from "./src/screens/SettingsScreen";
+import DeleteAccountScreen from "./src/screens/DeleteAccountScreen";
 
 // Navigation chrome (tab bar, headers, screen backgrounds) follows the current theme.
 const navThemeFor = (mode) => {
@@ -104,6 +105,7 @@ const ProfileStack = stack([
   ["ResubmitOrg", ResubmitOrgScreen, { title: "Organization details" }],
   ["SwitchAccount", SwitchAccountScreen, { title: "Switch account" }],
   ["Settings", SettingsScreen, { title: "Settings" }],
+  ["DeleteAccount", DeleteAccountScreen, { title: "Delete account" }],
 ]);
 const AdminStack = stack([
   ["AdminHome", AdminHomeScreen, { title: "Admin" }],

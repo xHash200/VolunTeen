@@ -54,8 +54,16 @@ export function useJobApplications(jobId) {
   return items;
 }
 
-export const applyToJob = (jobId, uid, name) =>
-  setDoc(appRef(jobId, uid), { uid, name: name || "Volunteer", status: "pending", appliedAt: serverTimestamp() });
+// `age` is the applicant's current age (from their private birth date); rules check it's correct.
+// It's how organizers see an applicant's age without the birth date being public.
+export const applyToJob = (jobId, uid, name, age) =>
+  setDoc(appRef(jobId, uid), {
+    uid,
+    name: name || "Volunteer",
+    status: "pending",
+    appliedAt: serverTimestamp(),
+    ...(age != null ? { age } : {}),
+  });
 
 const isOrganizerRole = (job) => job?.category === ORGANIZER_CATEGORY;
 // eventHelpers/{eventId_uid} { eventId, uid, name, jobId } — exists while someone is accepted into an

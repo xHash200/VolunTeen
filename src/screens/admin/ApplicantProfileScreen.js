@@ -4,12 +4,13 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useData } from "../../data/DataContext";
 import { Avatar } from "../../components/ui";
-import { ageFrom, colors, common } from "../../theme";
+import { colors, common } from "../../theme";
 import { formatPlace } from "../../data/romania";
 
 // Read-only public profile of a job applicant (users/{uid}), opened from JobApplicants.
 export default function ApplicantProfileScreen({ route }) {
-  const { uid, name, status } = route.params;
+  // age comes from the application (the birth date itself is private).
+  const { uid, name, status, age } = route.params;
   const { leagueById } = useData();
   const [profile, setProfile] = useState(undefined);
 
@@ -45,7 +46,7 @@ export default function ApplicantProfileScreen({ route }) {
       {profile === null && <Text style={common.meta}>This person hasn't filled in a profile.</Text>}
       {!!profile && (
         <View style={[common.card, { gap: 4 }]}>
-          {row("Age", ageFrom(profile.birthDate)?.toString())}
+          {row("Age", age != null ? `${age} (when they applied)` : null)}
           {row("City", formatPlace(profile))}
           {row("Faculty / school", profile.faculty)}
           {row("League", league)}

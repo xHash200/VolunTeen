@@ -99,7 +99,7 @@ export default function JobApplicantsScreen({ route, navigation }) {
                 <View key={a.id} style={[common.card, common.row]}>
                   <Pressable
                     style={[common.row, { flex: 1 }]}
-                    onPress={() => navigation.navigate("ApplicantProfile", { uid: a.id, name: a.name, status })}
+                    onPress={() => navigation.navigate("ApplicantProfile", { uid: a.id, name: a.name, status, age: a.age ?? null })}
                   >
                   <Avatar name={a.name} size={36} />
                   <View style={{ flex: 1 }}>

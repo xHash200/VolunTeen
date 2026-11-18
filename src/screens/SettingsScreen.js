@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, common, setThemePreference, useTheme } from "../theme";
+import { Button } from "../components/ui";
 
 const THEMES = [
   { value: "light", label: "Light", icon: "sunny-outline" },
@@ -8,7 +9,7 @@ const THEMES = [
   { value: "system", label: "Same as phone", icon: "phone-portrait-outline" },
 ];
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const { preference } = useTheme();
 
   return (
@@ -35,6 +36,9 @@ export default function SettingsScreen() {
           );
         })}
       </View>
+
+      <Text style={common.sectionTitle}>Account</Text>
+      <Button title="Delete my account" variant="danger" onPress={() => navigation.navigate("DeleteAccount")} />
     </ScrollView>
   );
 }
