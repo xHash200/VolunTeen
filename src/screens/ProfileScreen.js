@@ -7,7 +7,7 @@ import { useData } from "../data/DataContext";
 import { useFriendships } from "../chat/api";
 import { VERIFICATION_CONTACT } from "../config";
 import { Avatar, Badge, Button, Chips, Field } from "../components/ui";
-import { colors, common } from "../theme";
+import { colors, common, themed } from "../theme";
 
 export default function ProfileScreen({ navigation }) {
   const { user, profile, displayName, isOwner, isTester, isOrganizer, isStaff, accountType, orgStatus, updateProfile, signOut } =
@@ -86,7 +86,6 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.badges}>
             {isOwner && <Badge kind="owner" />}
             {isTester && <Badge kind="tester" />}
-            {isOrganizer && <Badge kind="organizer" />}
             <Badge kind={isOrg ? orgStatus ?? "pending" : "personal"} />
           </View>
           <Text style={common.meta}>
@@ -208,7 +207,7 @@ function OrgStatusCard({ navigation }) {
       <View style={[common.card, styles.okCard]}>
         <Text style={common.title}>Your organization is verified ✓</Text>
         <Text style={common.body}>
-          Volunteers can see your organization as verified. You can now create events and post volunteer roles in the Organizer tab.
+          Volunteers can see your organization as verified. You can now create events and post volunteer roles in the My events tab.
         </Text>
       </View>
     );
@@ -241,11 +240,11 @@ function OrgStatusCard({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
-  warnCard: { backgroundColor: colors.warnBg, borderColor: "#f3d9a6" },
-  okCard: { backgroundColor: "#e5f6ec", borderColor: "#bfe5cd" },
-  badCard: { backgroundColor: "#fdecec", borderColor: "#f5c6c6" },
+  warnCard: { backgroundColor: colors.warnBg, borderColor: colors.warnBorder },
+  okCard: { backgroundColor: colors.okBg, borderColor: colors.okBorder },
+  badCard: { backgroundColor: colors.badBg, borderColor: colors.badBorder },
   debug: { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontSize: 12, color: colors.text, lineHeight: 18 },
   code: { fontSize: 26, fontWeight: "800", letterSpacing: 2, color: colors.text, textAlign: "center", paddingVertical: 6 },
-});
+}));

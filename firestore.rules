@@ -7,12 +7,13 @@ service cloud.firestore {
     function isTester() { return signedIn() && exists(/databases/$(database)/documents/testers/$(request.auth.uid)); }
     // Staff = owners + testers: review organizations and edit content.
     function isStaff() { return isOwner() || isTester(); }
-    // Organizers: added by an owner, or any verified organization.
+    // Organizers = verified organizations: they create events and manage their roles.
     function isOrganizer() {
-      return signedIn() && (
-        exists(/databases/$(database)/documents/organizers/$(request.auth.uid)) ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('orgStatus', '') == 'verified'
-      );
+      return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('orgStatus', '') == 'verified';
+    }
+    // Event helpers: volunteers accepted into an event role with category "Organizer".
+    function isEventHelper(eventId) {
+      return signedIn() && exists(/databases/$(database)/documents/eventHelpers/$(eventId + '_' + request.auth.uid));
     }
     function ownsEvent(eventId) {
       return get(/databases/$(database)/documents/events/$(eventId)).data.get('createdBy', '') == request.auth.uid;
@@ -39,6 +40,8 @@ service cloud.firestore {
       allow update: if isStaff() || (isOrganizer()
         && ownsEvent(resource.data.eventId)
         && ownsEvent(request.resource.data.eventId))
+        // Event helpers only keep the accepted counter in step when they accept/decline.
+        || (isEventHelper(resource.data.eventId) && changed().hasOnly(['acceptedCount']))
         // An accepted volunteer withdrawing frees their spot, in the same batch that deletes their application.
         || (signedIn()
           && changed().hasOnly(['acceptedCount'])
@@ -48,10 +51,15 @@ service cloud.firestore {
       allow delete: if isStaff() || (isOrganizer() && ownsEvent(resource.data.eventId));
 
       // Volunteer applications: doc id = applicant uid. Personal accounts apply (status pending);
-      // the event's creator or staff accept/decline. Applicants see only their own.
+      // the event's creator or staff accept/decline; event helpers too, except for Organizer roles.
+      // Applicants see only their own.
       match /applications/{uid} {
+        function job() { return get(/databases/$(database)/documents/jobs/$(id)).data; }
         function canManageJob() {
-          return isStaff() || (isOrganizer() && ownsEvent(get(/databases/$(database)/documents/jobs/$(id)).data.eventId));
+          return isStaff() || (isOrganizer() && ownsEvent(job().eventId)) || canHelpJob();
+        }
+        function canHelpJob() {
+          return isEventHelper(job().eventId) && job().get('category', '') != 'Organizer';
         }
         allow read: if isSelf(uid) || canManageJob();
         allow create: if isSelf(uid)
@@ -62,8 +70,17 @@ service cloud.firestore {
         allow update: if canManageJob()
           && changed().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
           && request.resource.data.status in ['pending', 'accepted', 'declined'];
-        allow delete: if isSelf(uid) || canManageJob();
+        allow delete: if isSelf(uid) || (canManageJob() && !canHelpJob());
       }
+    }
+
+    // eventHelpers/{eventId_uid} { eventId, uid, name, jobId }: written when someone is accepted into
+    // (or leaves) an "Organizer" role. Only the event's organization or staff grant it; the helper can drop it.
+    match /eventHelpers/{helperId} {
+      allow read: if signedIn();
+      allow create: if (isStaff() || (isOrganizer() && ownsEvent(request.resource.data.eventId)))
+        && helperId == request.resource.data.eventId + '_' + request.resource.data.uid;
+      allow delete: if isStaff() || (isOrganizer() && ownsEvent(resource.data.eventId)) || isSelf(resource.data.uid);
     }
 
     // Owners: the first owner must be added in the Firebase console (doc id = their auth UID).
@@ -73,10 +90,6 @@ service cloud.firestore {
       allow write: if isOwner();
     }
     match /testers/{uid} {
-      allow read: if signedIn();
-      allow write: if isOwner();
-    }
-    match /organizers/{uid} {
       allow read: if signedIn();
       allow write: if isOwner();
     }

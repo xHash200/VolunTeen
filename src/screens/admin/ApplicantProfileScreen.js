@@ -55,7 +55,7 @@ export default function ApplicantProfileScreen({ route }) {
 
 const STATUS_LABEL = { pending: "On the waiting list", accepted: "Accepted", declined: "Declined" };
 const STATUS_STYLE = {
-  pending: { backgroundColor: colors.warnBg, color: colors.warnText, alignSelf: "center" },
+  pending: { get backgroundColor() { return colors.warnBg; }, get color() { return colors.warnText; }, alignSelf: "center" },
   accepted: { backgroundColor: "#e5f6ec", color: "#1e8a4c", alignSelf: "center" },
   declined: { backgroundColor: "#fdecec", color: "#c0392b", alignSelf: "center" },
 };

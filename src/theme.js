@@ -1,6 +1,28 @@
-import { StyleSheet } from "react-native";
+import { createContext, createElement, useContext, useEffect, useState } from "react";
+import { Appearance, StyleSheet } from "react-native";
+import * as SecureStore from "expo-secure-store";
 
-export const colors = {
+// ---------------------------------------------------------------------------------------------
+// Live theme. `colors`, `common` and every `themed(...)` style sheet are proxies that always return
+// the CURRENT theme's values, so code can keep writing `colors.card` / `styles.box` as before.
+// Rules for new code:
+//   • Build style sheets with `const styles = themed((colors) => StyleSheet.create({...}))`
+//     — never a plain module-level StyleSheet/object that reads `colors` (it would freeze one theme).
+//   • Read colors at render time (inside components), not in module-level constants.
+// ThemeProvider re-renders the app when the theme changes (App.js remounts the screens, keeping
+// the navigation state, so you stay where you were).
+// ---------------------------------------------------------------------------------------------
+
+const THEME_KEY = "themePreference"; // "light" | "dark" | "system"
+const readPreference = () => {
+  try {
+    return SecureStore.getItem(THEME_KEY) || "system";
+  } catch {
+    return "system";
+  }
+};
+
+const light = {
   bg: "#f6f7fb",
   card: "#ffffff",
   text: "#1d2433",
@@ -10,7 +32,79 @@ export const colors = {
   border: "#e3e6ee",
   warnBg: "#fff4e0",
   warnText: "#9a6200",
+  warnBorder: "#f3d9a6",
+  okBg: "#e5f6ec",
+  okBorder: "#bfe5cd",
+  badBg: "#fdecec",
+  badBorder: "#f5c6c6",
 };
+
+const dark = {
+  bg: "#0f1217",
+  card: "#1a1f27",
+  text: "#e8ebf1",
+  muted: "#9aa3b5",
+  accent: "#5b8def",
+  accentSoft: "#1f2d4a",
+  border: "#2b3240",
+  warnBg: "#3a2e14",
+  warnText: "#f2c46b",
+  warnBorder: "#5c4720",
+  okBg: "#15301f",
+  okBorder: "#24543a",
+  badBg: "#3a1b1b",
+  badBorder: "#5e2a2a",
+};
+
+const resolve = (pref, system) => (pref === "dark" || (pref === "system" && system === "dark") ? "dark" : "light");
+let preference = readPreference();
+let mode = resolve(preference, Appearance.getColorScheme());
+const palettes = { light, dark };
+
+// Always-current palette.
+export const colors = new Proxy({}, { get: (_, key) => palettes[mode][key] });
+export const isDarkMode = () => mode === "dark";
+
+// A style sheet rebuilt (once, then cached) for each theme. Accessing `styles.x` gives the current theme's style.
+export function themed(build) {
+  const cache = {};
+  const current = () => (cache[mode] ??= build(palettes[mode]));
+  return new Proxy({}, { get: (_, key) => current()[key], ownKeys: () => Reflect.ownKeys(current()), getOwnPropertyDescriptor: (_, key) => ({ ...Object.getOwnPropertyDescriptor(current(), key), configurable: true }) });
+}
+
+const listeners = new Set();
+function apply(nextPref) {
+  preference = nextPref;
+  const nextMode = resolve(preference, Appearance.getColorScheme());
+  mode = nextMode;
+  listeners.forEach((l) => l());
+}
+// Follow the phone's setting live while on "Same as phone".
+Appearance.addChangeListener(() => {
+  if (preference === "system") apply("system");
+});
+
+export async function setThemePreference(value) {
+  apply(value);
+  try {
+    await SecureStore.setItemAsync(THEME_KEY, value);
+  } catch (e) {
+    console.warn("Couldn't save theme:", e.message);
+  }
+}
+
+const ThemeContext = createContext({ mode, preference });
+export function ThemeProvider({ children }) {
+  const [state, setState] = useState({ mode, preference });
+  useEffect(() => {
+    const l = () => setState({ mode, preference });
+    listeners.add(l);
+    return () => listeners.delete(l);
+  }, []);
+  return createElement(ThemeContext.Provider, { value: state }, children);
+}
+// { mode: "light"|"dark", preference: "light"|"dark"|"system" } — components using it re-render on change.
+export const useTheme = () => useContext(ThemeContext);
 
 export const formatDate = (d) => {
   const date = new Date(d);
@@ -39,7 +133,7 @@ export const maskEuDate = (text) => {
   return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join(".");
 };
 
-export const common = StyleSheet.create({
+export const common = themed((colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { padding: 16, gap: 12 },
   card: {
@@ -77,4 +171,4 @@ export const common = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "600", color: colors.muted, marginTop: 8 },
   sectionTitle: { fontSize: 13, fontWeight: "700", color: colors.muted, textTransform: "uppercase", marginTop: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
-});
+}));

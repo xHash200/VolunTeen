@@ -55,10 +55,9 @@ export const rejectOrg = (uid, reviewerUid, reason) => reviewOrg(uid, reviewerUi
 export const ROLES = {
   owners: { label: "Owner", plural: "Owners" },
   testers: { label: "Tester", plural: "Testers" },
-  organizers: { label: "Organizer", plural: "Organizers" },
 };
 
-// role: "owners" | "testers" | "organizers" (the Firestore collection name)
+// role: "owners" | "testers" (the Firestore collection name)
 export function useTeam(role) {
   const [items, setItems] = useState([]);
   useEffect(

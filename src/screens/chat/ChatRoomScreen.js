@@ -4,7 +4,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../auth/AuthContext";
 import { sendMessage, useMessages } from "../../chat/api";
-import { colors, common } from "../../theme";
+import { colors, common, themed } from "../../theme";
 
 const timeOf = (ts) => {
   const d = ts?.toDate?.();
@@ -68,7 +68,7 @@ export default function ChatRoomScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   bubble: { maxWidth: "80%", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
   mine: { alignSelf: "flex-end", backgroundColor: colors.accent, borderBottomRightRadius: 4 },
   theirs: { alignSelf: "flex-start", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
@@ -86,4 +86,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   send: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 11 },
-});
+}));

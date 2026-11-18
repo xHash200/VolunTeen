@@ -4,7 +4,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { approveOrg, rejectOrg, useApplication } from "../../admin/api";
 import { useData } from "../../data/DataContext";
 import { Badge, Button, Field } from "../../components/ui";
-import { colors, common } from "../../theme";
+import { colors, common, themed } from "../../theme";
 
 const withScheme = (url) => (/^https?:\/\//i.test(url) ? url : `https://${url}`);
 
@@ -111,7 +111,7 @@ export default function OrgReviewScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   link: { color: colors.accent },
   code: { fontSize: 24, fontWeight: "800", letterSpacing: 2, textAlign: "center", color: colors.text },
-});
+}));

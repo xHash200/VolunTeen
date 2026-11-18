@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 // Accounts remembered on this device for one-tap switching.
 // Stored in the OS keychain/keystore via SecureStore (encrypted). Each value stays small:
 //   acct_index        JSON [uid, ...]
-//   acct_meta_<uid>   JSON { uid, email, name, type }
+//   acct_meta_<uid>   JSON { uid, email, name, type, role, nickname }  (nickname: local-only label set in the switcher)
 //   acct_pw_<uid>     password
 const INDEX = "acct_index";
 const metaKey = (uid) => `acct_meta_${uid}`;
@@ -40,7 +40,7 @@ export async function saveAccount({ uid, email, password }) {
 // Keeps the name/type shown in the switcher up to date. Only touches accounts already saved.
 export async function updateSavedAccountInfo(uid, info) {
   const prev = await readJson(metaKey(uid), null);
-  if (!prev || (prev.name === info.name && prev.type === info.type)) return;
+  if (!prev || Object.keys(info).every((k) => prev[k] === info[k])) return;
   try {
     await SecureStore.setItemAsync(metaKey(uid), JSON.stringify({ ...prev, ...info }));
   } catch {}

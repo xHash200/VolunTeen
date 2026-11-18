@@ -10,7 +10,7 @@ import {
   useFriendships,
 } from "../../chat/api";
 import { Avatar, Button, Segmented, SignInPrompt } from "../../components/ui";
-import { common } from "../../theme";
+import { common, themed } from "../../theme";
 
 export default function ChatHomeScreen({ navigation }) {
   const { user } = useAuth();
@@ -155,6 +155,6 @@ function FriendsList({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   actions: { gap: 6 },
-});
+}));

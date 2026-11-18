@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from "react-native";
 import { authErrorMessage, useAuth } from "../../auth/AuthContext";
 import { Button, Field } from "../../components/ui";
-import { colors, common } from "../../theme";
+import { colors, common, themed } from "../../theme";
 
 export default function SignInScreen({ navigation }) {
   const { signIn, resetPassword } = useAuth();
@@ -53,7 +53,7 @@ export default function SignInScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   error: { color: "#c0392b", fontSize: 14 },
   link: { color: colors.accent, fontWeight: "600", textAlign: "center" },
-});
+}));

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { collection, doc, increment, onSnapshot, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
+import { ORGANIZER_CATEGORY } from "../config";
 
 // Firestore layout:
 //   jobs/{jobId}/applications/{uid}  { uid, name, status: pending|accepted|declined, appliedAt, reviewedBy, reviewedAt }
@@ -56,20 +57,32 @@ export function useJobApplications(jobId) {
 export const applyToJob = (jobId, uid, name) =>
   setDoc(appRef(jobId, uid), { uid, name: name || "Volunteer", status: "pending", appliedAt: serverTimestamp() });
 
-// Withdraw. If the volunteer was accepted, their spot is freed in the same write.
-export async function withdrawApplication(jobId, uid, wasAccepted) {
+const isOrganizerRole = (job) => job?.category === ORGANIZER_CATEGORY;
+// eventHelpers/{eventId_uid} { eventId, uid, name, jobId } — exists while someone is accepted into an
+// "Organizer" role of that event. Lets them review the event's applicants (see firestore.rules).
+const helperRef = (eventId, uid) => doc(db, "eventHelpers", `${eventId}_${uid}`);
+
+// Withdraw. If the volunteer was accepted, their spot (and any helper access) is freed in the same write.
+export async function withdrawApplication(job, uid, wasAccepted) {
   const batch = writeBatch(db);
-  batch.delete(appRef(jobId, uid));
-  if (wasAccepted) batch.update(jobRef(jobId), { acceptedCount: increment(-1) });
+  batch.delete(appRef(job.id, uid));
+  if (wasAccepted) {
+    batch.update(jobRef(job.id), { acceptedCount: increment(-1) });
+    if (isOrganizerRole(job) && job.eventId) batch.delete(helperRef(job.eventId, uid));
+  }
   await batch.commit();
 }
 
-// Organizer decision. Keeps jobs/{jobId}.acceptedCount in step with accepted applications.
-export async function setApplicationStatus(jobId, app, status, reviewerUid) {
+// Organizer decision. Keeps jobs/{jobId}.acceptedCount and event-helper access in step with accepted applications.
+export async function setApplicationStatus(job, app, status, reviewerUid) {
   const batch = writeBatch(db);
-  batch.update(appRef(jobId, app.id), { status, reviewedBy: reviewerUid, reviewedAt: serverTimestamp() });
+  batch.update(appRef(job.id, app.id), { status, reviewedBy: reviewerUid, reviewedAt: serverTimestamp() });
   const delta = (status === "accepted" ? 1 : 0) - (app.status === "accepted" ? 1 : 0);
-  if (delta) batch.update(jobRef(jobId), { acceptedCount: increment(delta) });
+  if (delta) batch.update(jobRef(job.id), { acceptedCount: increment(delta) });
+  if (delta && isOrganizerRole(job) && job.eventId) {
+    if (delta > 0) batch.set(helperRef(job.eventId, app.id), { eventId: job.eventId, uid: app.id, name: app.name ?? "", jobId: String(job.id) });
+    else batch.delete(helperRef(job.eventId, app.id));
+  }
   await batch.commit();
 }
 

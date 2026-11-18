@@ -1,7 +1,16 @@
 import { isoToEu } from "../theme";
+import { ORGANIZER_CATEGORY, ROLE_CATEGORIES } from "../config";
 
 // Field definitions for the in-app content editor (owners + testers).
-// Field types: text, multiline, number, date (typed DD.MM.YYYY, stored YYYY-MM-DD), list (one item per line), bool, league, event.
+// Field types: text, multiline, number, date (typed DD.MM.YYYY, stored YYYY-MM-DD), list (one item per line), bool, league, event,
+// select (one of `options`).
+
+// Organizer roles first, then by title.
+export const sortRoles = (roles) =>
+  [...roles].sort(
+    (a, b) =>
+      (b.category === ORGANIZER_CATEGORY) - (a.category === ORGANIZER_CATEGORY) || String(a.title).localeCompare(String(b.title))
+  );
 
 export const CONTENT_TYPES = {
   jobs: {
@@ -12,7 +21,13 @@ export const CONTENT_TYPES = {
     fields: [
       { key: "title", label: "Job title", type: "text", required: true, placeholder: "e.g. Registration desk volunteer" },
       { key: "eventId", label: "Event", type: "event", required: true },
-      { key: "category", label: "Category", type: "text", placeholder: "e.g. Event support, Logistics, Media" },
+      {
+        key: "category",
+        label: "Category",
+        type: "select",
+        options: ROLE_CATEGORIES,
+        hint: "People accepted as Organizer can accept or decline volunteers for this event's other roles.",
+      },
       { key: "date", label: "Date", type: "date", required: true },
       { key: "hours", label: "Hours", type: "text", placeholder: "e.g. 09:00–14:00" },
       { key: "location", label: "Location", type: "text", placeholder: "e.g. Timișoara" },

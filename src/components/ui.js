@@ -1,5 +1,5 @@
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { colors, common } from "../theme";
+import { colors, common, themed } from "../theme";
 
 export function Button({ title, onPress, variant = "primary", disabled, loading, small, style }) {
   const v = styles[variant];
@@ -104,7 +104,7 @@ const BADGES = {
   tester: { label: "Tester", bg: "#ffd60a", fg: "#3d3200" },
   organizer: { label: "Organizer", bg: "#7b2cbf", fg: "#ffffff" },
   verified: { label: "✓ Verified organization", bg: "#e5f6ec", fg: "#1e8a4c" },
-  pending: { label: "Pending verification", bg: colors.warnBg, fg: colors.warnText },
+  pending: { label: "Pending verification", get bg() { return colors.warnBg; }, get fg() { return colors.warnText; } },
   rejected: { label: "Verification rejected", bg: "#fdecec", fg: "#c0392b" },
   personal: { label: "Personal account", bg: "#4cc9f0", fg: "#06304a" },
 };
@@ -115,7 +115,7 @@ export function Badge({ kind }) {
   return <Text style={[common.tag, { backgroundColor: b.bg, color: b.fg, alignSelf: "center" }]}>{b.label}</Text>;
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   hint: { fontSize: 12, color: colors.muted },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.card },
@@ -138,4 +138,4 @@ const styles = StyleSheet.create({
   avatar: { backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center" },
   avatarText: { color: colors.accent, fontWeight: "700" },
   center: { alignItems: "center", justifyContent: "center", padding: 24, gap: 16 },
-});
+}));

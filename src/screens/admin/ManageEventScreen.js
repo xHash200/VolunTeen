@@ -1,20 +1,23 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
-import { organizerOf } from "../../admin/contentSchemas";
+import { organizerOf, sortRoles } from "../../admin/contentSchemas";
 import { useData } from "../../data/DataContext";
+import { ORGANIZER_CATEGORY } from "../../config";
 import { Button } from "../../components/ui";
 import { colors, common, formatDate } from "../../theme";
 
-// Admin/organizer view of one event: edit it and manage its volunteer roles.
+// One event in the Admin / My events tab. The organization (and staff) edit it and its roles;
+// event helpers (accepted "Organizer"s) only open roles to review applicants.
 export default function ManageEventScreen({ route, navigation }) {
   const { eventById, jobs, leagueById } = useData();
-  const { canEditEvent } = useAuth();
+  const { canEditEvent, canReviewEvent } = useAuth();
   const event = eventById[route.params.eventId];
 
   if (!event) return <Text style={common.empty}>This event no longer exists.</Text>;
-  if (!canEditEvent(event)) return <Text style={common.empty}>You can only manage events you created.</Text>;
+  if (!canReviewEvent(event)) return <Text style={common.empty}>You can only manage events you created or help organize.</Text>;
+  const canEdit = canEditEvent(event);
 
-  const roles = jobs.filter((j) => j.eventId === event.id).sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  const roles = sortRoles(jobs.filter((j) => j.eventId === event.id));
   const totalSpots = roles.reduce((sum, j) => sum + (Number(j.spots) || 0), 0);
 
   return (
@@ -28,37 +31,61 @@ export default function ManageEventScreen({ route, navigation }) {
           {event.location ? ` · ${event.location}` : ""}
         </Text>
         {!!organizerOf(event, leagueById) && <Text style={common.meta}>Organized by {organizerOf(event, leagueById)}</Text>}
-        <Button
-          small
-          variant="secondary"
-          title="Edit event details"
-          onPress={() => navigation.navigate("ContentEdit", { type: "events", id: event.id })}
-          style={{ alignSelf: "flex-start", marginTop: 6 }}
-        />
+        {canEdit ? (
+          <Button
+            small
+            variant="secondary"
+            title="Edit event details"
+            onPress={() => navigation.navigate("ContentEdit", { type: "events", id: event.id })}
+            style={{ alignSelf: "flex-start", marginTop: 6 }}
+          />
+        ) : (
+          <Text style={[common.meta, { color: colors.accent }]}>
+            You're an Organizer for this event: you can accept or decline volunteers.
+          </Text>
+        )}
       </View>
 
       <Text style={common.sectionTitle}>
         Volunteer roles ({roles.length}) · {totalSpots} spots
       </Text>
-      <Button
-        title="+ Add volunteer role"
-        onPress={() =>
-          navigation.navigate("ContentEdit", {
-            type: "jobs",
-            preset: { eventId: event.id, date: event.date, location: event.location, hours: event.time },
-          })
-        }
-      />
+      {canEdit && (
+        <Button
+          title="+ Add volunteer role"
+          onPress={() =>
+            navigation.navigate("ContentEdit", {
+              type: "jobs",
+              preset: { eventId: event.id, date: event.date, location: event.location, hours: event.time },
+            })
+          }
+        />
+      )}
       {roles.length === 0 && <Text style={common.meta}>No roles yet. Add the volunteers you need for this event.</Text>}
-      {roles.map((j) => (
-        <Pressable key={j.id} style={common.card} onPress={() => navigation.navigate("JobApplicants", { jobId: j.id })}>
-          <Text style={common.title}>{j.title}</Text>
-          <Text style={common.meta}>
-            {[j.hours, `${Number(j.acceptedCount) || 0}/${j.spots ?? 0} spots filled`, j.category].filter(Boolean).join(" · ")}
-          </Text>
-          <Text style={{ color: colors.accent, fontSize: 13 }}>Tap to see applicants & edit</Text>
-        </Pressable>
-      ))}
+      {roles.map((j) => {
+        const isOrgRole = j.category === ORGANIZER_CATEGORY;
+        const locked = isOrgRole && !canEdit; // helpers can't pick other Organizers
+        return (
+          <Pressable
+            key={j.id}
+            disabled={locked}
+            style={[common.card, isOrgRole && { borderColor: "#7b2cbf", borderWidth: 2 }]}
+            onPress={() => navigation.navigate("JobApplicants", { jobId: j.id })}
+          >
+            {isOrgRole && <Text style={[common.tag, { backgroundColor: "#7b2cbf", color: "#fff" }]}>★ Organizer</Text>}
+            <Text style={common.title}>{j.title}</Text>
+            <Text style={common.meta}>
+              {[j.hours, `${Number(j.acceptedCount) || 0}/${j.spots ?? 0} spots filled`, !isOrgRole && j.category]
+                .filter(Boolean)
+                .join(" · ")}
+            </Text>
+            {!locked && (
+              <Text style={{ color: colors.accent, fontSize: 13 }}>
+                {canEdit ? "Tap to see applicants & edit" : "Tap to see applicants"}
+              </Text>
+            )}
+          </Pressable>
+        );
+      })}
     </ScrollView>
   );
 }

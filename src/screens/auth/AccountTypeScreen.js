@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, common } from "../../theme";
+import { colors, common, themed } from "../../theme";
 
 const TYPES = [
   {
@@ -37,7 +37,7 @@ export default function AccountTypeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   option: { flexDirection: "row", alignItems: "center", gap: 14 },
   icon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center" },
-});
+}));

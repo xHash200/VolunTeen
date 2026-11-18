@@ -1,6 +1,6 @@
-import { ActivityIndicator, Image, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { NavigationContainer } from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -33,12 +33,22 @@ import JobApplicantsScreen from "./src/screens/admin/JobApplicantsScreen";
 import ApplicantProfileScreen from "./src/screens/admin/ApplicantProfileScreen";
 import { CONTENT_TYPES } from "./src/admin/contentSchemas";
 import { ROLES } from "./src/admin/api";
-import { colors, common } from "./src/theme";
+import { colors, common, ThemeProvider, useTheme } from "./src/theme";
+import SettingsScreen from "./src/screens/SettingsScreen";
+
+// Navigation chrome (tab bar, headers, screen backgrounds) follows the current theme.
+const navThemeFor = (mode) => {
+  const base = mode === "dark" ? DarkTheme : DefaultTheme;
+  return {
+    ...base,
+    colors: { ...base.colors, primary: colors.accent, background: colors.bg, card: colors.card, text: colors.text, border: colors.border },
+  };
+};
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const headerStyle = { headerTintColor: colors.text, headerStyle: { backgroundColor: colors.card } };
+const headerStyle = () => ({ headerTintColor: colors.text, headerStyle: { backgroundColor: colors.card } });
 
 const stack = (screens) =>
   function StackNavigator() {
@@ -79,9 +89,21 @@ const ChatStack = stack([
   ["AddFriend", AddFriendScreen, { title: "Add friend" }],
 ]);
 const ProfileStack = stack([
-  ["ProfileHome", ProfileScreen, { title: "Profile" }],
+  [
+    "ProfileHome",
+    ProfileScreen,
+    ({ navigation }) => ({
+      title: "Profile",
+      headerRight: () => (
+        <Pressable onPress={() => navigation.navigate("Settings")} hitSlop={10} accessibilityLabel="Settings">
+          <Ionicons name="settings-outline" size={24} color={colors.text} />
+        </Pressable>
+      ),
+    }),
+  ],
   ["ResubmitOrg", ResubmitOrgScreen, { title: "Organization details" }],
   ["SwitchAccount", SwitchAccountScreen, { title: "Switch account" }],
+  ["Settings", SettingsScreen, { title: "Settings" }],
 ]);
 const AdminStack = stack([
   ["AdminHome", AdminHomeScreen, { title: "Admin" }],
@@ -103,7 +125,7 @@ const icons = {
 };
 
 function MainTabs() {
-  const { isStaff, canManageEvents } = useAuth();
+  const { canManageEvents, helperEventIds, adminTabTitle } = useAuth();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -119,7 +141,9 @@ function MainTabs() {
       <Tab.Screen name="Leagues" component={LeaguesStack} />
       <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: "Chat" }} />
       <Tab.Screen name="Profile" component={ProfileStack} />
-      {canManageEvents && <Tab.Screen name="Admin" component={AdminStack} options={{ title: isStaff ? "Admin" : "Organizer" }} />}
+      {(canManageEvents || helperEventIds.length > 0) && (
+        <Tab.Screen name="Admin" component={AdminStack} options={{ title: adminTabTitle }} />
+      )}
     </Tab.Navigator>
   );
 }
@@ -133,23 +157,44 @@ function Splash() {
   );
 }
 
+// Remembers where you are, so the screens can be rebuilt with new colors when the theme changes
+// (keyed remount below) without losing your place.
+let savedNavState;
+
 function Root() {
   const { user, initializing, available } = useAuth();
+  const { mode } = useTheme();
   if (!available)
     return <Text style={[common.empty, { marginTop: 80 }]}>Firebase isn't configured. Add your keys to .env.local.</Text>;
   if (initializing) return <Splash />;
-  return <NavigationContainer>{user ? <MainTabs /> : <AuthStack />}</NavigationContainer>;
+  return (
+    <NavigationContainer
+      key={mode}
+      theme={navThemeFor(mode)}
+      initialState={savedNavState?.signedIn === Boolean(user) ? savedNavState.state : undefined}
+      onStateChange={(state) => (savedNavState = { state, signedIn: Boolean(user) })}
+    >
+      {user ? <MainTabs /> : <AuthStack />}
+    </NavigationContainer>
+  );
+}
+
+function ThemedStatusBar() {
+  const { mode } = useTheme();
+  return <StatusBar style={mode === "dark" ? "light" : "dark"} />;
 }
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <DataProvider>
-          <Root />
-          <StatusBar style="dark" />
-        </DataProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <DataProvider>
+            <Root />
+            <ThemedStatusBar />
+          </DataProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }

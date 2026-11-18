@@ -1,6 +1,6 @@
 import { FlatList, Linking, Pressable, StyleSheet, Text } from "react-native";
 import { useData } from "../data/DataContext";
-import { colors, common } from "../theme";
+import { colors, common, themed } from "../theme";
 
 export default function LeaguesScreen({ navigation }) {
   const { leagues, jobs } = useData();
@@ -39,8 +39,8 @@ export default function LeaguesScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   warn: { backgroundColor: colors.warnBg, color: colors.warnText },
   link: { color: colors.accent, fontSize: 15 },
   count: { color: colors.accent, fontWeight: "600", marginTop: 4 },
-});
+}));

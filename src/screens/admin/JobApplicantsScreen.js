@@ -5,32 +5,46 @@ import { useData } from "../../data/DataContext";
 import { setApplicationStatus, syncAcceptedCount, useJobApplications } from "../../applications/api";
 import { Avatar, Button } from "../../components/ui";
 import { colors, common } from "../../theme";
+import { ORGANIZER_CATEGORY } from "../../config";
 
-// Organizer view of one volunteer role: its waiting list, accepted and declined volunteers.
+// Review one volunteer role: its waiting list, accepted and declined volunteers.
+// The event's organization (and staff) can do everything; event helpers (accepted "Organizer"s)
+// can accept/decline for the event's other roles, but not for Organizer roles and can't edit the role.
 export default function JobApplicantsScreen({ route, navigation }) {
   const { jobs, eventById } = useData();
-  const { user, canEditEvent } = useAuth();
+  const { user, canEditEvent, canReviewEvent } = useAuth();
   const job = jobs.find((j) => String(j.id) === String(route.params.jobId));
-  const apps = useJobApplications(job?.id);
+  const event = eventById[job?.eventId];
+  const canEdit = canEditEvent(event);
+  const allowed = Boolean(job) && (canEdit || (canReviewEvent(event) && job.category !== ORGANIZER_CATEGORY));
+  const apps = useJobApplications(allowed ? job.id : null);
   const [busyId, setBusyId] = useState(null);
 
   const accepted = (apps ?? []).filter((a) => a.status === "accepted");
 
   // Keep the public "spots left" counter correct (e.g. if a write was interrupted).
   useEffect(() => {
-    if (job && apps && (Number(job.acceptedCount) || 0) !== accepted.length) {
+    if (allowed && apps && (Number(job.acceptedCount) || 0) !== accepted.length) {
       syncAcceptedCount(job.id, accepted.length).catch((e) => console.warn("Count sync failed:", e.message));
     }
-  }, [job?.id, job?.acceptedCount, apps, accepted.length]);
+  }, [allowed, job?.id, job?.acceptedCount, apps, accepted.length]);
 
   if (!job) return <Text style={common.empty}>This role no longer exists.</Text>;
-  if (!canEditEvent(eventById[job.eventId])) return <Text style={common.empty}>You can only manage roles of events you created.</Text>;
+  if (!allowed) {
+    return (
+      <Text style={common.empty}>
+        {job.category === ORGANIZER_CATEGORY && canReviewEvent(event)
+          ? "Only the organization can choose who becomes an Organizer."
+          : "You can only manage roles of your own events."}
+      </Text>
+    );
+  }
 
   const spots = Number(job.spots) || 0;
   const decide = async (app, status) => {
     setBusyId(app.id);
     try {
-      await setApplicationStatus(job.id, app, status, user.uid);
+      await setApplicationStatus(job, app, status, user.uid);
     } catch (e) {
       Alert.alert("Couldn't update", e.message);
     } finally {
@@ -59,13 +73,15 @@ export default function JobApplicantsScreen({ route, navigation }) {
         <Text style={common.meta}>
           {accepted.length} of {spots} spots filled
         </Text>
-        <Button
-          small
-          variant="secondary"
-          title="Edit role details"
-          onPress={() => navigation.navigate("ContentEdit", { type: "jobs", id: job.id })}
-          style={{ alignSelf: "flex-start", marginTop: 6 }}
-        />
+        {canEdit && (
+          <Button
+            small
+            variant="secondary"
+            title="Edit role details"
+            onPress={() => navigation.navigate("ContentEdit", { type: "jobs", id: job.id })}
+            style={{ alignSelf: "flex-start", marginTop: 6 }}
+          />
+        )}
       </View>
 
       {apps === undefined && <Text style={common.meta}>Loading applicants…</Text>}

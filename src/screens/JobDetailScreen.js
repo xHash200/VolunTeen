@@ -45,7 +45,11 @@ export default function JobDetailScreen({ route }) {
 }
 
 const STATUS = {
-  pending: { text: "On the waiting list · waiting for the organizer's approval", bg: colors.warnBg, fg: colors.warnText },
+  pending: {
+    text: "On the waiting list · waiting for the organizer's approval",
+    get bg() { return colors.warnBg; },
+    get fg() { return colors.warnText; },
+  },
   accepted: { text: "Accepted ✓ · see you there!", bg: "#e5f6ec", fg: "#1e8a4c" },
   declined: { text: "Not selected this time", bg: "#fdecec", fg: "#c0392b" },
 };
@@ -88,7 +92,7 @@ function ApplyBox({ job, full }) {
   const withdraw = () =>
     Alert.alert("Withdraw application?", "You'll lose your place on the list.", [
       { text: "Keep", style: "cancel" },
-      { text: "Withdraw", style: "destructive", onPress: () => run(() => withdrawApplication(job.id, user.uid, app.status === "accepted")) },
+      { text: "Withdraw", style: "destructive", onPress: () => run(() => withdrawApplication(job, user.uid, app.status === "accepted")) },
     ]);
 
   return (

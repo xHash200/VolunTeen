@@ -8,9 +8,9 @@ import { Avatar, Button, Chips, Segmented } from "../../components/ui";
 import { colors, common, formatDate } from "../../theme";
 
 export default function AdminHomeScreen({ navigation }) {
-  const { isOwner, isStaff } = useAuth();
+  const { isOwner, isStaff, adminTabTitle } = useAuth();
   const [tab, setTab] = useState("events");
-  useLayoutEffect(() => navigation.setOptions({ title: isStaff ? "Admin" : "My events" }), [navigation, isStaff]);
+  useLayoutEffect(() => navigation.setOptions({ title: adminTabTitle }), [navigation, adminTabTitle]);
   const tabs = [
     { value: "events", label: "Events" },
     ...(isStaff
@@ -32,42 +32,54 @@ export default function AdminHomeScreen({ navigation }) {
   );
 }
 
-// Staff see every event; organizers only the events they created.
+// Staff see every event; organizations the events they created; event helpers the events they help organize.
 function ManageEvents({ navigation }) {
-  const { profile, isStaff, canEditEvent } = useAuth();
+  const { profile, isStaff, canManageEvents, canEditEvent, helperEventIds } = useAuth();
   const { events, jobs, leagueById } = useData();
-  const mine = events.filter((e) => canEditEvent(e)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const byDate = (a, b) => String(a.date).localeCompare(String(b.date));
+  const mine = events.filter((e) => canEditEvent(e)).sort(byDate);
+  const helping = events.filter((e) => !canEditEvent(e) && helperEventIds.includes(e.id)).sort(byDate);
+
+  const sections = [
+    ...(mine.length || canManageEvents ? [{ key: "mine", title: canManageEvents && helping.length ? "Your events" : null, items: mine }] : []),
+    ...(helping.length ? [{ key: "helping", title: "Events I help organize", items: helping }] : []),
+  ];
+
+  const card = (e) => {
+    const roles = jobs.filter((j) => j.eventId === e.id);
+    const spots = roles.reduce((sum, j) => sum + (Number(j.spots) || 0), 0);
+    return (
+      <Pressable key={e.id} style={common.card} onPress={() => navigation.navigate("ManageEvent", { eventId: e.id, title: e.title })}>
+        <Text style={common.title}>{e.title}</Text>
+        <Text style={common.meta}>{[formatDate(e.date), organizerOf(e, leagueById)].filter(Boolean).join(" · ")}</Text>
+        <Text style={{ color: colors.accent, fontWeight: "600", marginTop: 2 }}>
+          {roles.length} role{roles.length === 1 ? "" : "s"} · {spots} spots — {canEditEvent(e) ? "manage" : "review applicants"} →
+        </Text>
+      </Pressable>
+    );
+  };
 
   return (
-    <FlatList
-      data={mine}
-      keyExtractor={(e) => e.id}
-      contentContainerStyle={common.list}
-      ListHeaderComponent={
+    <ScrollView contentContainerStyle={common.list}>
+      {canManageEvents && (
         <Button
           title="+ Create event"
           onPress={() => navigation.navigate("ContentEdit", { type: "events", preset: { leagueId: profile?.leagueId ?? "" } })}
         />
-      }
-      ListEmptyComponent={
-        <Text style={common.empty}>
-          {isStaff ? "No events yet." : "You haven't created any events yet. Create one and add the volunteer roles you need."}
-        </Text>
-      }
-      renderItem={({ item: e }) => {
-        const roles = jobs.filter((j) => j.eventId === e.id);
-        const spots = roles.reduce((sum, j) => sum + (Number(j.spots) || 0), 0);
-        return (
-          <Pressable style={common.card} onPress={() => navigation.navigate("ManageEvent", { eventId: e.id, title: e.title })}>
-            <Text style={common.title}>{e.title}</Text>
-            <Text style={common.meta}>{[formatDate(e.date), organizerOf(e, leagueById)].filter(Boolean).join(" · ")}</Text>
-            <Text style={{ color: colors.accent, fontWeight: "600", marginTop: 2 }}>
-              {roles.length} role{roles.length === 1 ? "" : "s"} · {spots} spots — manage →
+      )}
+      {sections.map((s) => (
+        <View key={s.key} style={{ gap: 12 }}>
+          {!!s.title && <Text style={common.sectionTitle}>{s.title}</Text>}
+          {s.items.length === 0 ? (
+            <Text style={common.empty}>
+              {isStaff ? "No events yet." : "You haven't created any events yet. Create one and add the volunteer roles you need."}
             </Text>
-          </Pressable>
-        );
-      }}
-    />
+          ) : (
+            s.items.map(card)
+          )}
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -143,8 +155,10 @@ function Team({ navigation }) {
     <ScrollView contentContainerStyle={common.list}>
       <TeamSection role="owners" navigation={navigation} />
       <TeamSection role="testers" navigation={navigation} />
-      <TeamSection role="organizers" navigation={navigation} />
-      <Text style={common.meta}>Verified organizations are organizers automatically.</Text>
+      <Text style={common.meta}>
+        Verified organizations create and manage their own events. Volunteers accepted into an event's "Organizer" role can
+        accept or decline volunteers for that event.
+      </Text>
     </ScrollView>
   );
 }

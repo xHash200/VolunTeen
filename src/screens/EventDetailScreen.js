@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text } from "react-native";
-import { organizerOf } from "../admin/contentSchemas";
+import { organizerOf, sortRoles } from "../admin/contentSchemas";
+import { ORGANIZER_CATEGORY } from "../config";
 import { useData } from "../data/DataContext";
 import { common, formatDate } from "../theme";
 
@@ -9,7 +10,7 @@ export default function EventDetailScreen({ route, navigation }) {
 
   if (!event) return <Text style={common.empty}>This event is no longer available.</Text>;
 
-  const roles = jobs.filter((j) => j.eventId === event.id);
+  const roles = sortRoles(jobs.filter((j) => j.eventId === event.id));
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.list}>
@@ -22,7 +23,14 @@ export default function EventDetailScreen({ route, navigation }) {
       <Text style={common.sectionTitle}>Volunteer roles</Text>
       {roles.length === 0 && <Text style={common.meta}>No volunteer roles posted yet.</Text>}
       {roles.map((j) => (
-        <Pressable key={j.id} style={common.card} onPress={() => navigation.navigate("JobDetail", { jobId: j.id })}>
+        <Pressable
+          key={j.id}
+          style={[common.card, j.category === ORGANIZER_CATEGORY && { borderColor: "#7b2cbf", borderWidth: 2 }]}
+          onPress={() => navigation.navigate("JobDetail", { jobId: j.id })}
+        >
+          {j.category === ORGANIZER_CATEGORY && (
+            <Text style={[common.tag, { backgroundColor: "#7b2cbf", color: "#fff" }]}>★ Organizer</Text>
+          )}
           <Text style={common.title}>{j.title}</Text>
           <Text style={common.meta}>
             {j.hours} · {j.spots} spots

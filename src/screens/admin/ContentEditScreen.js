@@ -122,6 +122,14 @@ export default function ContentEditScreen({ route, navigation }) {
             )}
           </View>
         );
+      case "select":
+        return (
+          <View key={f.key} style={{ gap: 6 }}>
+            <Text style={common.label}>{f.label}</Text>
+            <Chips options={f.options.map((o) => ({ value: o, label: o }))} value={form[f.key]} onChange={set(f.key)} />
+            {!!f.hint && <Text style={[common.meta, { fontSize: 12 }]}>{f.hint}</Text>}
+          </View>
+        );
       case "bool":
         return <Checkbox key={f.key} checked={Boolean(form[f.key])} onChange={set(f.key)} label={f.label} />;
       default:

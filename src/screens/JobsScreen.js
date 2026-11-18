@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useData } from "../data/DataContext";
-import { colors, common, formatDate } from "../theme";
+import { colors, common, formatDate, themed } from "../theme";
 
 export default function JobsScreen({ navigation, route }) {
   const { jobs, leagues, leagueById, eventById, loading } = useData();
@@ -67,7 +67,7 @@ export default function JobsScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   filters: { paddingTop: 12, gap: 10, backgroundColor: colors.card, borderBottomWidth: 1, borderColor: colors.border },
   search: {
     marginHorizontal: 16,
@@ -84,4 +84,4 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipText: { color: colors.text, fontSize: 14 },
   chipTextActive: { color: "#fff" },
-});
+}));

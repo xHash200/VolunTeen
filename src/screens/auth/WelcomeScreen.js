@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "../../components/ui";
-import { colors } from "../../theme";
+import { colors, themed } from "../../theme";
 
 // Replace assets/logo.png with the real logo (square PNG, ~1024×1024, transparent background works best).
 const logo = require("../../../assets/logo.png");
@@ -24,11 +24,11 @@ export default function WelcomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed((colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: 24, justifyContent: "space-between" },
   brand: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   logo: { width: 140, height: 140, borderRadius: 28 },
   name: { fontSize: 34, fontWeight: "800", color: colors.text },
   tagline: { fontSize: 16, color: colors.muted, textAlign: "center", maxWidth: 300 },
   actions: { gap: 12, paddingBottom: 8 },
-});
+}));

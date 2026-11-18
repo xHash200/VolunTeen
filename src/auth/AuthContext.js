@@ -9,7 +9,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 // Account types:
@@ -19,8 +19,9 @@ import { auth, db } from "../firebase";
 //   owner         — any account with a doc at owners/{uid} (added by another owner or in the Firebase console)
 //   tester        — any account with a doc at testers/{uid} (added by an owner). Can review organizations
 //                   and edit content, but can't manage owners/testers.
-//   organizer     — doc at organizers/{uid} (added by an owner) OR a verified organization. Can create
-//                   events and manage volunteer roles for events they created.
+//   organizer     — = a verified organization. Creates events and manages their roles + applicants.
+//   event helper  — a volunteer accepted into an event role whose category is "Organizer"
+//                   (eventHelpers/{eventId_uid}). Can accept/decline applicants for that event's other roles.
 
 const AuthContext = createContext(null);
 
@@ -40,7 +41,7 @@ export function AuthProvider({ children }) {
   const [application, setApplication] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isTester, setIsTester] = useState(false);
-  const [hasOrganizerRole, setHasOrganizerRole] = useState(false);
+  const [helperEventIds, setHelperEventIds] = useState([]);
   const [initializing, setInitializing] = useState(Boolean(auth));
   // True while a sign-up is writing its own profile, so we don't create a default one at the same time.
   const signingUp = useRef(false);
@@ -59,7 +60,7 @@ export function AuthProvider({ children }) {
       setProfile(null);
       setIsOwner(false);
       setIsTester(false);
-      setHasOrganizerRole(false);
+      setHelperEventIds([]);
       return;
     }
     const unsubProfile = onSnapshot(
@@ -95,16 +96,16 @@ export function AuthProvider({ children }) {
       (snap) => setIsTester(snap.exists()),
       () => setIsTester(false)
     );
-    const unsubOrganizer = onSnapshot(
-      doc(db, "organizers", user.uid),
-      (snap) => setHasOrganizerRole(snap.exists()),
-      () => setHasOrganizerRole(false)
+    const unsubHelper = onSnapshot(
+      query(collection(db, "eventHelpers"), where("uid", "==", user.uid)),
+      (snap) => setHelperEventIds(snap.docs.map((d) => d.data().eventId)),
+      () => setHelperEventIds([])
     );
     return () => {
       unsubProfile();
       unsubOwner();
       unsubTester();
-      unsubOrganizer();
+      unsubHelper();
     };
   }, [user]);
 
@@ -125,9 +126,11 @@ export function AuthProvider({ children }) {
   // Keep the account switcher's name/type labels current.
   useEffect(() => {
     if (user && profile) {
-      updateSavedAccountInfo(user.uid, { name: profile.displayName || user.email, type: profile.accountType ?? "personal" });
+      const isOrgVerified = profile.accountType === "organization" && profile.orgStatus === "verified";
+      const role = isOwner ? "owner" : isTester ? "tester" : isOrgVerified ? "organization" : null;
+      updateSavedAccountInfo(user.uid, { name: profile.displayName || user.email, type: profile.accountType ?? "personal", role });
     }
-  }, [user, profile?.displayName, profile?.accountType]);
+  }, [user, profile?.displayName, profile?.accountType, profile?.orgStatus, isOwner, isTester]);
 
   const withSigningUp = (fn) => async (...args) => {
     signingUp.current = true;
@@ -214,9 +217,8 @@ export function AuthProvider({ children }) {
 
   const isStaff = isOwner || isTester;
   const isVerifiedOrg = accountType === "organization" && profile?.orgStatus === "verified";
-  // Organizers create events and manage volunteer roles for their own events.
-  // Verified organizations are organizers automatically; owners can also grant it (organizers/{uid}).
-  const isOrganizer = hasOrganizerRole || isVerifiedOrg;
+  // Only verified organizations create events and manage their roles.
+  const isOrganizer = isVerifiedOrg;
 
   const value = {
     user,
@@ -233,6 +235,12 @@ export function AuthProvider({ children }) {
     canManageEvents: isStaff || isOrganizer,
     // Staff can edit any event; organizers only the ones they created.
     canEditEvent: (event) => Boolean(event) && (isStaff || (isOrganizer && event.createdBy === user?.uid)),
+    // Event helpers (accepted into an "Organizer" role) can review applicants, but not edit the event.
+    helperEventIds,
+    canReviewEvent: (event) =>
+      Boolean(event) && (isStaff || (isOrganizer && event.createdBy === user?.uid) || helperEventIds.includes(event.id)),
+    // Name of the management tab (bottom-right) and its header, by highest role.
+    adminTabTitle: isOwner ? "Owner" : isTester ? "Tester" : isOrganizer ? "Organization" : "My events",
     accountType,
     orgStatus: profile?.orgStatus ?? null,
     isVerifiedOrg,

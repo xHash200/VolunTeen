@@ -14,9 +14,11 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - **organization**: `accountType = "organization"`, `orgStatus` pending|verified|rejected. Details + verification code in `orgApplications/{uid}`. Verification = email confirmed + org sends the `VT-XXXXXX` code from its official page/email + owner approves in Admin tab.
 - **owner**: has a doc at `owners/{uid}`. Full Admin tab: Organizations, Content, Team (add/remove owners + testers). First owner must be created in the Firebase console.
 - **tester**: has a doc at `testers/{uid}` (added by owners in Admin → Team). Admin tab without Team: review orgs + edit jobs/events/leagues. Sees Tester badge + debug card on Profile.
-- **organizer**: doc at `organizers/{uid}` (added by owners in Admin → Team) OR any verified organization. Gets the tab titled "Organizer" with only the Events section: create events + manage roles for events they created (`events.createdBy`). Rules check `ownsEvent()` for jobs.
-- `isStaff` (useAuth + rules) = owner or tester. `canManageEvents` = staff or organizer. `canEditEvent(event)` = staff or creator.
-- Public Events/Jobs tabs are read-only; all event management lives in the Admin/Organizer tab (Events section → ManageEvent → ContentEdit).
+- **organization = organizer**: only verified organizations (`isOrganizer` = `orgStatus == "verified"`) create events and manage their roles + applicants (`events.createdBy`, rules `ownsEvent()`). Tab titled "My events". There is no separate organizer team role anymore.
+- **event helper**: a volunteer accepted into an event role whose `category` is `"Organizer"` (`ORGANIZER_CATEGORY` in `src/config.js`). Gets `eventHelpers/{eventId_uid}`, the "My events" tab ("Events I help organize") and can accept/decline applicants for that event's other roles, not edit the event/roles and not pick other Organizers.
+- `isStaff` (useAuth + rules) = owner or tester. `canManageEvents` = staff or organization. `canEditEvent(event)` = staff or creator. `canReviewEvent(event)` = canEditEvent or helper.
+- Public Events/Jobs tabs are read-only; all event management lives in the Admin/My events tab (Events section → ManageEvent → JobApplicants / ContentEdit).
+- Role categories (pick-list): `ROLE_CATEGORIES` in `src/config.js`. Organizer roles are sorted first and highlighted (`sortRoles`).
 - `src/config.js` — `VERIFICATION_CONTACT` (where orgs send the code), org types.
 - Logo: `assets/logo.png` (placeholder copy of icon.png — replace with the real logo).
 
@@ -30,6 +32,7 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - `src/data/DataContext.js` — `useData()`: live `leagues`, `events`, `jobs`; falls back to `src/data/sample.js`.
 - `src/chat/api.js` — friendships, chats, messages: hooks + write helpers.
 - `src/components/ui.js` — Button, Segmented, Avatar, SignInPrompt. `src/theme.js` — colors, shared styles.
+- Light/dark theme (Profile → ⚙ Settings) switches live. `colors`/`common` are proxies for the current theme. Write style sheets as `const styles = themed((colors) => StyleSheet.create({...}))` and never put `colors.x` in a plain module-level constant (use a getter or read it inside the component). App.js remounts the NavigationContainer (keyed by theme, nav state kept) on change.
 
 ## Data model (Firestore)
 
@@ -39,7 +42,8 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - `jobs/{id}/applications/{uid}`: uid, name, status pending|accepted|declined, appliedAt, reviewedBy, reviewedAt. Personal accounts only; applicants read their own, event creator/staff manage (`src/applications/api.js`, Admin → event → role → JobApplicants).
 - `users/{uid}`: displayName, displayNameLower (for search), accountType, orgStatus (orgs), faculty, bio, leagueId, photo (256px JPEG data URI, ~30 KB — no Firebase Storage; see `src/profile/photo.js`)
 - `orgApplications/{uid}`: orgName, orgType, university, faculty, leagueId, website, socialUrl, contactName, contactRole, phone, notes, contactEmail, verificationCode, status, emailVerified, rejectReason, reviewedBy, reviewedAt
-- `owners/{uid}`, `testers/{uid}`, `organizers/{uid}`: displayName, addedBy, addedAt
+- `owners/{uid}`, `testers/{uid}`: displayName, addedBy, addedAt
+- `eventHelpers/{eventId_uid}`: eventId, uid, name, jobId — written by `setApplicationStatus` / `withdrawApplication` (`src/applications/api.js`)
 - `friendships/{uidA_uidB}` (sorted): members[2], memberNames{}, requestedBy, status pending|accepted
 - `chats/{id}`: type direct|group, name (group), members[], memberNames{}, lastMessage, lastSender, updatedAt. Direct chat id: `dm_<uidA_uidB>`.
 - `chats/{id}/messages/{id}`: text, senderId, senderName, createdAt
