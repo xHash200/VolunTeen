@@ -70,6 +70,7 @@ export function AuthProvider({ children }) {
         setProfile(null);
         // Accounts created outside the app (e.g. Firebase console → Authentication → Add user)
         // have no profile yet — create a personal one so they show up in search.
+        // Rules only allow this (no birth date) for owners/testers; for anyone else it's refused.
         if (!snap.metadata.fromCache && !signingUp.current) {
           const name = user.displayName || user.email?.split("@")[0] || "New user";
           setDoc(doc(db, "users", user.uid), {

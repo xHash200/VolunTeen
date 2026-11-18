@@ -104,9 +104,10 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if signedIn();
       allow create: if isSelf(uid) && (
-        // Personal: birth date must be 16+ (empty only for profiles auto-created for console-made accounts).
+        // Personal: birth date must be 16+. Only owners/testers (set up in the console) may start without one.
         (request.resource.data.accountType == 'personal' && !('orgStatus' in request.resource.data)
-          && (request.resource.data.get('birthDate', '') == '' || isOldEnough(request.resource.data.birthDate))) ||
+          && (isOldEnough(request.resource.data.get('birthDate', ''))
+            || (request.resource.data.get('birthDate', '') == '' && isStaff()))) ||
         (request.resource.data.accountType == 'organization' && request.resource.data.orgStatus == 'pending')
       );
       // birthDate is permanent: it can only be set while it's still empty (older accounts set it once).
