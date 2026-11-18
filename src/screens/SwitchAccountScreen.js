@@ -8,23 +8,25 @@ import { forgetAccount, listSavedAccounts, updateSavedAccountInfo } from "../aut
 import { Avatar, Button, Field } from "../components/ui";
 import { colors, common } from "../theme";
 
-const ROLE_LABEL = { owner: "Owner account", tester: "Tester account", organization: "Organization" };
+const ROLE_LABEL = { owner: "Owner account", admin: "Admin account", tester: "Tester account", organization: "Organization" };
 const TYPE_LABEL = { personal: "Personal account", organization: "Organization (not verified yet)" };
 const label = (a) => ROLE_LABEL[a.role] ?? TYPE_LABEL[a.type] ?? "";
 // Most permissions first: owner → tester → organization → personal.
-const rank = (a) => (a.role === "owner" ? 0 : a.role === "tester" ? 1 : a.type === "organization" ? 2 : 3);
+const rank = (a) =>
+  a.role === "owner" ? 0 : a.role === "admin" ? 1 : a.role === "tester" ? 2 : a.type === "organization" ? 3 : 4;
 // Nickname is a label stored only on this phone; it doesn't change the account's profile name.
 const shownName = (a) => a.nickname || a.name || a.email;
 
 async function liveInfo(a) {
-  const [profile, owner, tester] = await Promise.all([
+  const [profile, owner, admin, tester] = await Promise.all([
     getDoc(doc(db, "users", a.uid)),
     getDoc(doc(db, "owners", a.uid)),
+    getDoc(doc(db, "admins", a.uid)),
     getDoc(doc(db, "testers", a.uid)),
   ]);
   const p = profile.exists() ? profile.data() : {};
   const type = p.accountType ?? a.type ?? "personal";
-  const role = owner.exists() ? "owner" : tester.exists() ? "tester" : type === "organization" && p.orgStatus === "verified" ? "organization" : null;
+  const role = owner.exists() ? "owner" : admin.exists() ? "admin" : tester.exists() ? "tester" : type === "organization" && p.orgStatus === "verified" ? "organization" : null;
   return { ...a, name: p.displayName || a.name, type, role };
 }
 

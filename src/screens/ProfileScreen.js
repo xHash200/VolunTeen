@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import Constants from "expo-constants";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { deleteFullPhoto, pickProfilePhoto, saveFullPhoto } from "../profile/photo";
+import { Ionicons } from "@expo/vector-icons";
+import { RoleTag, tagFor } from "../components/RoleTag";
+import { nameError } from "../profile/names";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
 import { useFriendships } from "../chat/api";
@@ -12,13 +15,13 @@ import { colors, common, themed, ageFrom, euToIso, maskEuDate } from "../theme";
 
 export default function ProfileScreen({ navigation }) {
   const {
-    user, profile, displayName, isOwner, isTester, isStaff, accountType, orgStatus, updateProfile, signOut,
+    user, profile, displayName, isOwner, isAdmin, isTester, isStaff, accountType, orgStatus, updateProfile, signOut,
     birthDate, privateLoaded, setBirthDate,
   } = useAuth();
   const { leagues, leagueById } = useData();
   const friends = useFriendships(user.uid).filter((f) => f.status === "accepted");
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ displayName: "", place: {}, birth: "", faculty: "", bio: "", leagueId: "" });
+  const [form, setForm] = useState({ displayName: "", nickname: "", place: {}, birth: "", faculty: "", bio: "", leagueId: "" });
   const [busy, setBusy] = useState(false);
   const isOrg = accountType === "organization";
   const age = ageFrom(birthDate);
@@ -27,6 +30,7 @@ export default function ProfileScreen({ navigation }) {
   useEffect(() => {
     setForm({
       displayName: profile?.displayName ?? displayName,
+      nickname: profile?.nickname ?? "",
       // Older profiles may have a typed city that isn't in the list; they pick again from the list.
       place: { country: profile?.country || "Romania", county: profile?.county ?? "", city: profile?.county ? profile?.city ?? "" : "" },
       birth: "",
@@ -38,6 +42,8 @@ export default function ProfileScreen({ navigation }) {
 
   const save = async () => {
     if (!form.displayName.trim()) return Alert.alert("Name can't be empty");
+    const badName = nameError(form.displayName, isOrg ? "Organization name" : "Name") || nameError(form.nickname, "Nickname");
+    if (badName) return Alert.alert(badName);
     // Older accounts can add their date of birth once; after that it's locked (see firestore.rules).
     const { birth, place, ...rest } = form;
     if (!isOrg && (!place.county || !place.city)) return Alert.alert("Please select your county and city");
@@ -52,7 +58,7 @@ export default function ProfileScreen({ navigation }) {
     setBusy(true);
     try {
       if (newBirthDate) await setBirthDate(newBirthDate); // private, set once
-      await updateProfile({ ...rest, displayName: form.displayName.trim(), country: place.country ?? "", county: place.county ?? "", city: place.city ?? "" });
+      await updateProfile({ ...rest, nickname: form.nickname.trim(), displayName: form.displayName.trim(), country: place.country ?? "", county: place.county ?? "", city: place.city ?? "" });
       setEditing(false);
     } catch (e) {
       Alert.alert("Couldn't save", e.message);
@@ -114,10 +120,15 @@ export default function ProfileScreen({ navigation }) {
               <Text style={{ color: colors.accent, fontSize: 13 }}>{profile?.photo ? "Change photo" : "Add photo"}</Text>
             )}
           </Pressable>
-          <Text style={[common.title, { fontSize: 20 }]}>{displayName}</Text>
+          {/* Under the photo: nickname if set (personal accounts), otherwise the name. Real name is in "About me". */}
+          <Text style={[common.title, { fontSize: 20 }]}>
+            <RoleTag kind={tagFor({ isOwner, isAdmin, isTester, isVerifiedOrg: isOrg && orgStatus === "verified" })} />
+            {(!isOrg && profile?.nickname) || displayName}
+          </Text>
           <Text style={common.meta}>{user.email}</Text>
           <View style={styles.badges}>
             {isOwner && <Badge kind="owner" />}
+            {isAdmin && <Badge kind="admin" />}
             {isTester && <Badge kind="tester" />}
             {/* Owners can do everything an organization can (create and manage events). */}
             {isOwner && <Badge kind="organization" />}
@@ -133,7 +144,17 @@ export default function ProfileScreen({ navigation }) {
 
         {editing ? (
           <View style={{ gap: 10 }}>
-            <Field label={isOrg ? "Organization name" : "Name"} value={form.displayName} onChangeText={set("displayName")} />
+            <Field label={isOrg ? "Organization name" : "Real name"} value={form.displayName} onChangeText={set("displayName")} />
+            {!isOrg && (
+              <Field
+                label="Nickname"
+                value={form.nickname}
+                onChangeText={set("nickname")}
+                placeholder="Optional"
+                hint="Shown under your photo. Leave empty to show your real name."
+                maxLength={30}
+              />
+            )}
             {!isOrg &&
               (canSetBirth ? (
                 <Field
@@ -170,8 +191,14 @@ export default function ProfileScreen({ navigation }) {
           </View>
         ) : (
           <View style={[common.card, { gap: 4 }]}>
+            <View style={[common.row, { gap: 8, marginBottom: 4 }]}>
+              <Ionicons name={isOrg ? "business-outline" : "person-outline"} size={20} color={colors.accent} />
+              <Text style={[common.title, { flex: 1 }]}>{isOrg ? "About the organization" : "About me"}</Text>
+            </View>
             {!isOrg && (
               <>
+                <Text style={common.label}>Name</Text>
+                <Text style={common.body}>{profile?.displayName || displayName}</Text>
                 <Text style={common.label}>Age</Text>
                 <Text style={common.body}>{age ?? "—"}</Text>
               </>
@@ -182,7 +209,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={common.body}>{profile?.faculty || "—"}</Text>
             <Text style={common.label}>League</Text>
             <Text style={common.body}>{leagueById[profile?.leagueId]?.name || "—"}</Text>
-            <Text style={common.label}>About</Text>
+            <Text style={common.label}>Bio</Text>
             <Text style={common.body}>{profile?.bio || "—"}</Text>
             <Button title="Edit profile" variant="secondary" onPress={() => setEditing(true)} style={{ marginTop: 12 }} />
           </View>
@@ -199,16 +226,16 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
-// Shown to testers and owners — handy to paste into bug reports.
+// Shown to staff (owners, admins, testers) — handy to paste into bug reports.
 function DebugCard() {
-  const { user, accountType, orgStatus, isOwner, isTester, isOrganizer, emailVerified } = useAuth();
+  const { user, accountType, orgStatus, isOwner, isAdmin, isTester, isOrganizer, emailVerified } = useAuth();
   const { source, jobs, events, leagues } = useData();
   const rows = [
     ["App version", `${Constants.expoConfig?.version ?? "?"} (${Constants.executionEnvironment ?? "?"})`],
     ["Platform", `${Platform.OS} ${Platform.Version}`],
     ["User ID", user.uid],
     // Most powerful role first.
-    ["Account", [isOwner && "owner", isTester && "tester", isOrganizer && "organizer", accountType, orgStatus].filter(Boolean).join(", ")],
+    ["Account", [isOwner && "owner", isAdmin && "admin", isTester && "tester", isOrganizer && "organizer", accountType, orgStatus].filter(Boolean).join(", ")],
     ["Email verified", emailVerified ? "yes" : "no"],
     ["Data", `${source} · ${jobs.length} jobs, ${events.length} events, ${leagues.length} leagues`],
     ["Firebase project", process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "—"],

@@ -223,6 +223,7 @@ export function Checkbox({ checked, onChange, label }) {
 
 const BADGES = {
   owner: { label: "Owner", bg: "#d62828", fg: "#ffffff" },
+  admin: { label: "Admin", bg: "#e85d04", fg: "#ffffff" },
   tester: { label: "Tester", bg: "#ffd60a", fg: "#3d3200" },
   organizer: { label: "Organizer", bg: "#7b2cbf", fg: "#ffffff" },
   organization: { label: "Organization", bg: "#7b2cbf", fg: "#ffffff" },

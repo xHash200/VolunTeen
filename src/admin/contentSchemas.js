@@ -1,7 +1,7 @@
 import { isoToEu } from "../theme";
 import { ORGANIZER_CATEGORY, ROLE_CATEGORIES } from "../config";
 
-// Field definitions for the in-app content editor (owners + testers).
+// Field definitions for the in-app content editor (staff: owners, admins, testers).
 // Field types: text, multiline, number, date (typed DD.MM.YYYY, stored YYYY-MM-DD), list (one item per line), bool, league, event,
 // select (one of `options`).
 

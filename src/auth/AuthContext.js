@@ -11,14 +11,16 @@ import {
 } from "firebase/auth";
 import { collection, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { stripBlockedChars } from "../profile/names";
 
 // Account types:
 //   personal      — normal person (users/{uid}.accountType = "personal", or missing for old accounts)
 //   organization  — users/{uid}.accountType = "organization", orgStatus pending|verified|rejected,
 //                   details in orgApplications/{uid}
 //   owner         — any account with a doc at owners/{uid} (added by another owner or in the Firebase console)
+//   admin         — doc at admins/{uid} (added by an owner). Tester powers + add/remove testers.
 //   tester        — any account with a doc at testers/{uid} (added by an owner). Can review organizations
-//                   and edit content, but can't manage owners/testers.
+//                   and edit content, but can't manage the team.
 //   organizer     — = a verified organization. Creates events and manages their roles + applicants.
 //   event helper  — a volunteer accepted into an event role whose category is "Organizer"
 //                   (eventHelpers/{eventId_uid}). Can accept/decline applicants for that event's other roles.
@@ -41,6 +43,7 @@ export function AuthProvider({ children }) {
   const [application, setApplication] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isTester, setIsTester] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [helperEventIds, setHelperEventIds] = useState([]);
   const [privateInfo, setPrivateInfo] = useState(undefined);
   const [initializing, setInitializing] = useState(Boolean(auth));
@@ -62,6 +65,7 @@ export function AuthProvider({ children }) {
       setPrivateInfo(undefined);
       setIsOwner(false);
       setIsTester(false);
+      setIsAdmin(false);
       setHelperEventIds([]);
       return;
     }
@@ -72,9 +76,9 @@ export function AuthProvider({ children }) {
         setProfile(null);
         // Accounts created outside the app (e.g. Firebase console → Authentication → Add user)
         // have no profile yet — create a personal one so they show up in search.
-        // Rules only allow this (no birth date) for owners/testers; for anyone else it's refused.
+        // Rules only allow this (no birth date) for staff (owners/admins/testers); for anyone else it's refused.
         if (!snap.metadata.fromCache && !signingUp.current) {
-          const name = user.displayName || user.email?.split("@")[0] || "New user";
+          const name = stripBlockedChars(user.displayName || user.email?.split("@")[0]).trim() || "New user";
           setDoc(doc(db, "users", user.uid), {
             displayName: name,
             displayNameLower: lower(name),
@@ -105,6 +109,11 @@ export function AuthProvider({ children }) {
       (snap) => setIsTester(snap.exists()),
       () => setIsTester(false)
     );
+    const unsubAdmin = onSnapshot(
+      doc(db, "admins", user.uid),
+      (snap) => setIsAdmin(snap.exists()),
+      () => setIsAdmin(false)
+    );
     const unsubHelper = onSnapshot(
       query(collection(db, "eventHelpers"), where("uid", "==", user.uid)),
       (snap) => setHelperEventIds(snap.docs.map((d) => d.data().eventId)),
@@ -115,6 +124,7 @@ export function AuthProvider({ children }) {
       unsubPrivate();
       unsubOwner();
       unsubTester();
+      unsubAdmin();
       unsubHelper();
     };
   }, [user]);
@@ -146,10 +156,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (user && profile) {
       const isOrgVerified = profile.accountType === "organization" && profile.orgStatus === "verified";
-      const role = isOwner ? "owner" : isTester ? "tester" : isOrgVerified ? "organization" : null;
+      const role = isOwner ? "owner" : isAdmin ? "admin" : isTester ? "tester" : isOrgVerified ? "organization" : null;
       updateSavedAccountInfo(user.uid, { name: profile.displayName || user.email, type: profile.accountType ?? "personal", role });
     }
-  }, [user, profile?.displayName, profile?.accountType, profile?.orgStatus, isOwner, isTester]);
+  }, [user, profile?.displayName, profile?.accountType, profile?.orgStatus, isOwner, isAdmin, isTester]);
 
   const withSigningUp = (fn) => async (...args) => {
     signingUp.current = true;
@@ -242,7 +252,7 @@ export function AuthProvider({ children }) {
     await batch.commit();
   };
 
-  const isStaff = isOwner || isTester;
+  const isStaff = isOwner || isAdmin || isTester;
   const isVerifiedOrg = accountType === "organization" && profile?.orgStatus === "verified";
   // Only verified organizations create events and manage their roles.
   const isOrganizer = isVerifiedOrg;
@@ -256,7 +266,10 @@ export function AuthProvider({ children }) {
     emailVerified,
     isOwner,
     isTester,
-    // Staff = owners + testers: can review organizations and edit all jobs/events/leagues.
+    isAdmin,
+    // Team tab: owners manage owners, admins and testers; admins manage testers only.
+    canManageTeam: isOwner || isAdmin,
+    // Staff = owners + admins + testers: can review organizations and edit all jobs/events/leagues.
     isStaff,
     isOrganizer,
     canManageEvents: isStaff || isOrganizer,
@@ -272,7 +285,7 @@ export function AuthProvider({ children }) {
     // Older accounts add their birth date once (16+, then locked).
     setBirthDate: (iso) => setDoc(doc(db, "users", user.uid, "private", "profile"), { birthDate: iso }),
     // Name of the management tab (bottom-right) and its header, by highest role.
-    adminTabTitle: isOwner ? "Owner" : isTester ? "Tester" : isOrganizer ? "Organization" : "My events",
+    adminTabTitle: isOwner ? "Owner" : isAdmin ? "Admin" : isTester ? "Tester" : isOrganizer ? "Organization" : "My events",
     accountType,
     orgStatus: profile?.orgStatus ?? null,
     isVerifiedOrg,

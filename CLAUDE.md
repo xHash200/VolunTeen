@@ -12,11 +12,13 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - App is gated: signed out → AuthStack (Welcome → SignIn / AccountType → SignUpPersonal / SignUpOrganization).
 - **personal**: `users/{uid}.accountType = "personal"` (missing = personal for old accounts).
 - **organization**: `accountType = "organization"`, `orgStatus` pending|verified|rejected. Details + verification code in `orgApplications/{uid}`. Verification = email confirmed + org sends the `VT-XXXXXX` code from its official page/email + owner approves in Admin tab.
-- **owner**: has a doc at `owners/{uid}`. Full Admin tab: Organizations, Content, Team (add/remove owners + testers). First owner must be created in the Firebase console.
-- **tester**: has a doc at `testers/{uid}` (added by owners in Admin → Team). Admin tab without Team: review orgs + edit jobs/events/leagues. Sees Tester badge + debug card on Profile.
+- **owner**: has a doc at `owners/{uid}`. Full Admin tab: Organizations, Content, Team (add/remove owners, admins + testers). Tag [OWN]. First owner must be created in the Firebase console.
+- **admin**: doc at `admins/{uid}` (added by owners). Tester powers + Team tab limited to adding/removing testers. Tag [ADM].
+- **tester**: has a doc at `testers/{uid}` (added by owners or admins in Admin → Team). Admin tab without Team: review orgs + edit jobs/events/leagues. Sees Tester badge + debug card on Profile. Tag [QA].
+- **Role tags**: `src/components/RoleTag.js` — `[OWN]`/`[ADM]`/`[QA]`/`[ORG]` before a name, highest role only (`tagFor`). For other people use `useRoleTagOf(uid, profile)`. Shown on Profile and ApplicantProfile. Names, nicknames and org names can't contain any bracket (`[] () {} <>`), `\ | /`, or look-alikes, so tags can't be faked: `nameError`/`stripBlockedChars` in `src/profile/names.js`, enforced again in rules (`noBrackets`). Any new name field must use them.
 - **organization = organizer**: only verified organizations (`isOrganizer` = `orgStatus == "verified"`) create events and manage their roles + applicants (`events.createdBy`, rules `ownsEvent()`). Tab titled "My events". There is no separate organizer team role anymore.
 - **event helper**: a volunteer accepted into an event role whose `category` is `"Organizer"` (`ORGANIZER_CATEGORY` in `src/config.js`). Gets `eventHelpers/{eventId_uid}`, the "My events" tab ("Events I help organize") and can accept/decline applicants for that event's other roles, not edit the event/roles and not pick other Organizers.
-- `isStaff` (useAuth + rules) = owner or tester. `canManageEvents` = staff or organization. `canEditEvent(event)` = staff or creator. `canReviewEvent(event)` = canEditEvent or helper.
+- `isStaff` (useAuth + rules) = owner, admin or tester. `canManageTeam` = owner or admin. `canManageEvents` = staff or organization. `canEditEvent(event)` = staff or creator. `canReviewEvent(event)` = canEditEvent or helper.
 - Public Events/Jobs tabs are read-only; all event management lives in the Admin/My events tab (Events section → ManageEvent → JobApplicants / ContentEdit).
 - Role categories (pick-list): `ROLE_CATEGORIES` in `src/config.js`. Organizer roles are sorted first and highlighted (`sortRoles`).
 - `src/config.js` — `VERIFICATION_CONTACT` (where orgs send the code), org types.
@@ -25,7 +27,7 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 ## Structure
 
 - `App.js` — auth gate + tabs (each a stack): Jobs, Events, Leagues, Chat (ChatHome → ChatRoom / NewGroup / AddFriend), Profile (→ ResubmitOrg), Admin (staff + organizers: AdminHome → ManageEvent / OrgReview / ContentEdit / AddTeamMember).
-- `src/admin/api.js` — org review, team (owners/testers), content save/delete. `src/admin/contentSchemas.js` — editor field definitions for jobs/events/leagues.
+- `src/admin/api.js` — org review, team (owners/admins/testers), content save/delete. `src/admin/contentSchemas.js` — editor field definitions for jobs/events/leagues.
 - `src/components/OrgFields.js` — shared organization details form + validation.
 - `src/firebase.js` — app/db/auth init from `EXPO_PUBLIC_FIREBASE_*` env vars (`.env.local` locally, `eas.json` for builds). All null when unconfigured.
 - `src/auth/AuthContext.js` — `useAuth()`: user, profile (`users/{uid}`), signIn/signUp/signOut/updateProfile.
@@ -41,15 +43,15 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - `jobs/{id}`: title, event, eventId, leagueId, date, location, spots, hours, category, description, requirements[], perks[], createdBy, acceptedCount
 - Account deletion: Settings → Delete my account (`src/auth/deleteAccount.js`). If you add a new per-user collection, delete it there too.
 - `jobs/{id}/applications/{uid}`: uid, name, age, status pending|accepted|declined, appliedAt, reviewedBy, reviewedAt. Personal accounts only; applicants read their own, event creator/staff manage (`src/applications/api.js`, Admin → event → role → JobApplicants).
-- `users/{uid}`: displayName, displayNameLower (for search), accountType, orgStatus (orgs), (birth date is NOT here — it's private in `users/{uid}/private/profile` { birthDate } (YYYY-MM-DD, 16+, set once, readable by self + staff; `useAuth().birthDate`). Organizers see age via `applications.age`, which rules verify against it), country, county, city (picked from `src/data/romania.js` via `PlaceFields`/`SelectField` in ui.js; shown with `formatPlace`), faculty, bio, leagueId, photo (512px JPEG data URI, ~50–90 KB; a 1080px copy lives in `users/{uid}/photo/full` { data }, loaded only by `PhotoViewer` — no Firebase Storage; see `src/profile/photo.js`)
+- `users/{uid}`: displayName (real name; used in chats, applications, search), nickname (optional, shown under the photo on Profile), displayNameLower (for search), accountType, orgStatus (orgs), (birth date is NOT here — it's private in `users/{uid}/private/profile` { birthDate } (YYYY-MM-DD, 16+, set once, readable by self + staff; `useAuth().birthDate`). Organizers see age via `applications.age`, which rules verify against it), country, county, city (picked from `src/data/romania.js` via `PlaceFields`/`SelectField` in ui.js; shown with `formatPlace`), faculty, bio, leagueId, photo (512px JPEG data URI, ~50–90 KB; a 1080px copy lives in `users/{uid}/photo/full` { data }, loaded only by `PhotoViewer` — no Firebase Storage; see `src/profile/photo.js`)
 - `orgApplications/{uid}`: orgName, orgType, university, faculty, leagueId, website, socialUrl, contactName, contactRole, phone, notes, contactEmail, verificationCode, status, emailVerified, rejectReason, reviewedBy, reviewedAt
-- `owners/{uid}`, `testers/{uid}`: displayName, addedBy, addedAt
+- `owners/{uid}`, `admins/{uid}`, `testers/{uid}`: displayName, addedBy, addedAt
 - `eventHelpers/{eventId_uid}`: eventId, uid, name, jobId — written by `setApplicationStatus` / `withdrawApplication` (`src/applications/api.js`)
 - `friendships/{uidA_uidB}` (sorted): members[2], memberNames{}, requestedBy, status pending|accepted
 - `chats/{id}`: type direct|group, name (group), members[], memberNames{}, lastMessage, lastSender, updatedAt. Direct chat id: `dm_<uidA_uidB>`.
 - `chats/{id}/messages/{id}`: text, senderId, senderName, createdAt
 
-Security rules: `firestore.rules` (deploy with `npx firebase-tools deploy --only firestore:rules`). Public collections are writable only by staff (owners + testers). Roles are enforced there, not just in the UI.
+Security rules: `firestore.rules` (deploy with `npx firebase-tools deploy --only firestore:rules`). Public collections are writable only by staff (owners + admins + testers). Roles are enforced there, not just in the UI.
 Avoid queries needing composite indexes — sort client-side.
 
 ## Commands

@@ -5,6 +5,7 @@ import { Button, Field, PlaceFields } from "../../components/ui";
 import { citiesOf, countiesOf, COUNTRIES } from "../../data/romania";
 import { ageFrom, common, euToIso, maskEuDate } from "../../theme";
 import { MIN_AGE } from "../../config";
+import { nameError } from "../../profile/names";
 
 export default function SignUpPersonalScreen() {
   const { signUpPersonal } = useAuth();
@@ -19,6 +20,8 @@ export default function SignUpPersonalScreen() {
   const submit = async () => {
     setError("");
     if (!form.name.trim()) return setError("Please enter your name.");
+    const badName = nameError(form.name);
+    if (badName) return setError(badName);
     if (!birthDate) return setError("Please enter a real date of birth, like 31.12.2008.");
     if (age > 120) return setError("Please check your date of birth.");
     if (age < MIN_AGE) return setError(`You need to be at least ${MIN_AGE} to use VolunTeen.`);

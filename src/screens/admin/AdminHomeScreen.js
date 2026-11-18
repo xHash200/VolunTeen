@@ -8,7 +8,7 @@ import { Avatar, Button, Chips, Segmented } from "../../components/ui";
 import { colors, common, formatDate } from "../../theme";
 
 export default function AdminHomeScreen({ navigation }) {
-  const { isOwner, isStaff, adminTabTitle } = useAuth();
+  const { isStaff, canManageTeam, adminTabTitle } = useAuth();
   const [tab, setTab] = useState("events");
   useLayoutEffect(() => navigation.setOptions({ title: adminTabTitle }), [navigation, adminTabTitle]);
   const tabs = [
@@ -19,7 +19,7 @@ export default function AdminHomeScreen({ navigation }) {
           { value: "content", label: "Content" },
         ]
       : []),
-    ...(isOwner ? [{ value: "team", label: "Team" }] : []),
+    ...(canManageTeam ? [{ value: "team", label: "Team" }] : []),
   ];
   return (
     <View style={common.screen}>
@@ -27,7 +27,7 @@ export default function AdminHomeScreen({ navigation }) {
       {tab === "events" && <ManageEvents navigation={navigation} />}
       {tab === "orgs" && isStaff && <OrgRequests navigation={navigation} />}
       {tab === "content" && isStaff && <Content navigation={navigation} />}
-      {tab === "team" && isOwner && <Team navigation={navigation} />}
+      {tab === "team" && canManageTeam && <Team navigation={navigation} />}
     </View>
   );
 }
@@ -150,10 +150,13 @@ function Content({ navigation }) {
   );
 }
 
+// Owners manage owners, admins and testers; admins manage testers only.
 function Team({ navigation }) {
+  const { isOwner } = useAuth();
   return (
     <ScrollView contentContainerStyle={common.list}>
-      <TeamSection role="owners" navigation={navigation} />
+      {isOwner && <TeamSection role="owners" navigation={navigation} />}
+      {isOwner && <TeamSection role="admins" navigation={navigation} />}
       <TeamSection role="testers" navigation={navigation} />
       <Text style={common.meta}>
         Verified organizations create and manage their own events. Volunteers accepted into an event's "Organizer" role can

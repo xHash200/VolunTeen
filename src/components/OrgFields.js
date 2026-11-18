@@ -3,6 +3,7 @@ import { ORG_TYPES } from "../config";
 import { useData } from "../data/DataContext";
 import { common } from "../theme";
 import { Chips, Field } from "./ui";
+import { nameError } from "../profile/names";
 
 export const emptyOrg = {
   orgName: "",
@@ -22,6 +23,7 @@ export const pickOrg = (src = {}) => Object.fromEntries(Object.keys(emptyOrg).ma
 
 export function validateOrg(org) {
   if (!org.orgName.trim()) return "Please enter the organization's name.";
+  if (nameError(org.orgName)) return nameError(org.orgName, "The organization's name");
   if (!org.university.trim()) return "Please enter the university.";
   if (!org.website.trim() && !org.socialUrl.trim()) return "Add a website or an official social media page so we can verify you.";
   if (!org.contactName.trim() || !org.contactRole.trim()) return "Please enter the contact person and their role.";

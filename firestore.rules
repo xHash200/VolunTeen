@@ -5,8 +5,9 @@ service cloud.firestore {
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
     function isOwner() { return signedIn() && exists(/databases/$(database)/documents/owners/$(request.auth.uid)); }
     function isTester() { return signedIn() && exists(/databases/$(database)/documents/testers/$(request.auth.uid)); }
-    // Staff = owners + testers: review organizations and edit content.
-    function isStaff() { return isOwner() || isTester(); }
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    // Staff = owners + admins + testers: review organizations and edit content.
+    function isStaff() { return isOwner() || isAdmin() || isTester(); }
     // Organizers = verified organizations: they create events and manage their roles.
     function isOrganizer() {
       return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('orgStatus', '') == 'verified';
@@ -100,29 +101,50 @@ service cloud.firestore {
     }
 
     // Owners: the first owner must be added in the Firebase console (doc id = their auth UID).
-    // Only owners can add/remove owners and testers.
+    // Owners add/remove owners and admins; owners and admins add/remove testers.
     match /owners/{uid} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+    match /admins/{uid} {
       allow read: if signedIn();
       allow write: if isOwner();
     }
     match /testers/{uid} {
       allow read: if signedIn();
-      allow write: if isOwner();
+      allow write: if isOwner() || isAdmin();
     }
 
     // Profiles. accountType can never change; orgStatus is set by staff
     // (the org itself may only move it from rejected back to pending when resubmitting).
     // The public profile never holds the birth date (it lives in users/{uid}/private/profile).
     match /users/{uid} {
+      // Brackets are reserved for role tags like [OWN], so names can't contain any bracket
+      // ([] () {} <>), the symbols \ | /, or their look-alikes. Same list as src/profile/names.js.
+      // (?s) so a line break can't hide one.
+      function noBrackets(s) {
+        return s is string
+          && !s.matches('(?s).*[\\[\\](){}<>\\\\|/［］（）｛｝＜＞＼｜／【】〔〕〖〗⟦⟧⟨⟩〈〉《》「」『』❨❩❪❫❴❵¦∣⁄∕⧸⧹].*');
+      }
+      // Optional nickname shown under the photo on Profile (max 30 characters, like the app field).
+      function validNickname() {
+        return !('nickname' in request.resource.data)
+          || (noBrackets(request.resource.data.nickname) && request.resource.data.nickname.size() <= 30);
+      }
+      // Checked only when the name changes, so older names don't block other profile edits.
+      function validNameChange() {
+        return !changed().hasAny(['displayName']) || noBrackets(request.resource.data.displayName);
+      }
       allow read: if signedIn();
-      allow create: if isSelf(uid) && !('birthDate' in request.resource.data) && (
-        // Personal: a 16+ private birth date must be written in the same batch. Only owners/testers
-        // (set up in the console) may start without one.
+      allow create: if isSelf(uid) && !('birthDate' in request.resource.data) && validNickname()
+        && noBrackets(request.resource.data.displayName) && (
+        // Personal: a 16+ private birth date must be written in the same batch. Only staff
+        // (owners/admins/testers, set up in the console) may start without one.
         (request.resource.data.accountType == 'personal' && !('orgStatus' in request.resource.data)
           && ((existsAfter(privPath(uid)) && isOldEnough(getAfter(privPath(uid)).data.birthDate)) || isStaff())) ||
         (request.resource.data.accountType == 'organization' && request.resource.data.orgStatus == 'pending')
       );
-      allow update: if !('birthDate' in request.resource.data) && (
+      allow update: if !('birthDate' in request.resource.data) && validNickname() && validNameChange() && (
         (isSelf(uid) && !changed().hasAny(['accountType', 'orgStatus'])) ||
         (isSelf(uid) && !changed().hasAny(['accountType'])
           && resource.data.orgStatus in ['pending', 'rejected']

@@ -7,18 +7,18 @@ import { Button, Field } from "../components/ui";
 import { colors, common } from "../theme";
 
 export default function DeleteAccountScreen({ navigation }) {
-  const { user, isOwner, isTester, accountType } = useAuth();
+  const { user, isOwner, isAdmin, isTester, accountType } = useAuth();
   const { jobs } = useData();
   const [password, setPassword] = useState("");
   const [step, setStep] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  if (isOwner || isTester) {
+  if (isOwner || isAdmin || isTester) {
     return (
       <View style={[common.screen, common.list]}>
         <Text style={common.body}>
-          {isOwner ? "Owner" : "Tester"} accounts can't be deleted from the app. Ask another owner to remove your role in
+          {isOwner ? "Owner" : isAdmin ? "Admin" : "Tester"} accounts can't be deleted from the app. Ask {isOwner ? "another" : "an"} owner to remove your role in
           Admin → Team first, then delete the account here.
         </Text>
       </View>

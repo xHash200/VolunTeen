@@ -7,11 +7,13 @@ import { Avatar, Button, Field } from "../../components/ui";
 import { common } from "../../theme";
 
 const DESCRIPTIONS = {
-  owners: "will have full access: verify organizations, edit content, and add or remove owners and testers.",
-  testers: "will be able to verify organizations and edit jobs, events and leagues, and will see debug info.",};
+  owners: "will have full access: verify organizations, edit content, and add or remove owners, admins and testers.",
+  admins: "will be able to verify organizations, edit jobs, events and leagues, and add or remove testers.",
+  testers: "will be able to verify organizations and edit jobs, events and leagues, and will see debug info.",
+};
 
 export default function AddTeamMemberScreen({ route }) {
-  const { role } = route.params; // "owners" | "testers"
+  const { role } = route.params; // "owners" | "admins" | "testers"
   const { user } = useAuth();
   const members = useTeam(role);
   const [text, setText] = useState("");

@@ -50,14 +50,15 @@ async function reviewOrg(uid, reviewerUid, status, rejectReason = "") {
 export const approveOrg = (uid, reviewerUid) => reviewOrg(uid, reviewerUid, "verified");
 export const rejectOrg = (uid, reviewerUid, reason) => reviewOrg(uid, reviewerUid, "rejected", reason.trim());
 
-// ---------- Team (owners + testers) ----------
+// ---------- Team (owners + admins + testers) ----------
 
 export const ROLES = {
   owners: { label: "Owner", plural: "Owners" },
+  admins: { label: "Admin", plural: "Admins" },
   testers: { label: "Tester", plural: "Testers" },
 };
 
-// role: "owners" | "testers" (the Firestore collection name)
+// role: "owners" | "admins" | "testers" (the Firestore collection name)
 export function useTeam(role) {
   const [items, setItems] = useState([]);
   useEffect(
