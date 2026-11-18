@@ -208,16 +208,32 @@ service cloud.firestore {
       allow delete: if isMember(resource.data);
     }
 
-    // Chats (direct + group) and their messages: members only.
+    // Team chats: two fixed chats whose access comes from the role, not a member list, so they
+    // follow Admin → Team changes automatically. team_owners = owners; team_staff = owners + admins + testers.
+    function isTeamChat(chatId) { return chatId in ['team_owners', 'team_staff']; }
+    function inTeamChat(chatId) {
+      return (chatId == 'team_owners' && isOwner()) || (chatId == 'team_staff' && isStaff());
+    }
+    function chatData(chatId) { return get(/databases/$(database)/documents/chats/$(chatId)).data; }
+    function canUseChat(chatId) {
+      return (isTeamChat(chatId) && inTeamChat(chatId)) || (!isTeamChat(chatId) && isMember(chatData(chatId)));
+    }
+
+    // Chats (direct + group) and their messages: members only. Team chats: by role (above).
     match /chats/{chatId} {
-      allow read: if signedIn() && (resource == null || isMember(resource.data));
-      allow create: if isMember(request.resource.data);
-      allow update: if isMember(resource.data);
+      allow get: if signedIn() && ((isTeamChat(chatId) && inTeamChat(chatId))
+        || (!isTeamChat(chatId) && (resource == null || isMember(resource.data))));
+      allow list: if signedIn() && isMember(resource.data);
+      allow create: if (isTeamChat(chatId) && inTeamChat(chatId)
+          && request.resource.data.type == 'team'
+          && request.resource.data.keys().hasOnly(['type', 'name', 'lastMessage', 'lastSender', 'createdAt', 'updatedAt']))
+        || (!isTeamChat(chatId) && isMember(request.resource.data));
+      allow update: if (isTeamChat(chatId) && inTeamChat(chatId) && changed().hasOnly(['lastMessage', 'lastSender', 'updatedAt']))
+        || (!isTeamChat(chatId) && isMember(resource.data));
 
       match /messages/{messageId} {
-        allow read: if isMember(get(/databases/$(database)/documents/chats/$(chatId)).data);
-        allow create: if isMember(get(/databases/$(database)/documents/chats/$(chatId)).data)
-          && request.resource.data.senderId == request.auth.uid;
+        allow read: if canUseChat(chatId);
+        allow create: if canUseChat(chatId) && request.resource.data.senderId == request.auth.uid;
       }
     }
   }

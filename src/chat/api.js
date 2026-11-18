@@ -21,6 +21,8 @@ import { db } from "../firebase";
 // Firestore layout:
 //   friendships/{uidA_uidB}  { members[2], memberNames{}, requestedBy, status: pending|accepted }
 //   chats/{id}               { type: direct|group, name?, members[], memberNames{}, lastMessage, updatedAt }
+//   chats/team_owners, chats/team_staff  { type: team, name, lastMessage, lastSender, updatedAt } — no members;
+//                            access comes from the role (see TEAM_CHATS + firestore.rules)
 //   chats/{id}/messages/{id} { text, senderId, senderName, createdAt }
 
 export const pairId = (a, b) => [a, b].sort().join("_");
@@ -166,8 +168,42 @@ export async function sendMessage(chatId, me, myName, text) {
   });
 }
 
+// ---------- Team chats ----------
+// Fixed chats for the team. Nobody is added by hand: who's in them follows the roles in Admin → Team.
+export const TEAM_CHATS = [
+  { id: "team_owners", name: "Owners", description: "Owners only", allowed: (r) => r.isOwner },
+  { id: "team_staff", name: "Staff", description: "Owners, admins and testers", allowed: (r) => r.isStaff },
+];
+
+// roles: { isOwner, isStaff } from useAuth(). Creates a team chat the first time someone allowed opens the list.
+export function useTeamChats(roles) {
+  const ids = TEAM_CHATS.filter((t) => t.allowed(roles)).map((t) => t.id);
+  const key = ids.join(",");
+  const [chats, setChats] = useState({});
+  useEffect(() => {
+    setChats({});
+    const unsubs = ids.map((id) => {
+      const team = TEAM_CHATS.find((t) => t.id === id);
+      const ref = doc(db, "chats", id);
+      return onSnapshot(
+        ref,
+        (snap) => {
+          if (snap.exists()) return setChats((c) => ({ ...c, [id]: { id, ...snap.data(), description: team.description } }));
+          if (snap.metadata.fromCache) return; // wait for the server before creating it
+          setDoc(ref, { type: "team", name: team.name, lastMessage: "", createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+            .catch(() => {}); // someone else created it at the same moment — the snapshot picks it up
+        },
+        (err) => console.warn("Team chat error:", err.message)
+      );
+    });
+    return () => unsubs.forEach((u) => u());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return ids.map((id) => chats[id]).filter(Boolean);
+}
+
 export function chatTitle(chat, uid) {
-  if (chat.type === "group") return chat.name;
+  if (chat.type === "group" || chat.type === "team") return chat.name;
   const other = chat.members.find((m) => m !== uid);
   return chat.memberNames?.[other] ?? "Chat";
 }

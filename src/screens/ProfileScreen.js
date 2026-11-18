@@ -7,7 +7,6 @@ import { RoleTag, tagFor } from "../components/RoleTag";
 import { nameError } from "../profile/names";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
-import { useFriendships } from "../chat/api";
 import { MIN_AGE, VERIFICATION_CONTACT } from "../config";
 import { Avatar, Badge, Button, Chips, Field, PhotoViewer, PlaceFields } from "../components/ui";
 import { citiesOf, countiesOf, COUNTRIES, formatPlace } from "../data/romania";
@@ -19,7 +18,6 @@ export default function ProfileScreen({ navigation }) {
     birthDate, privateLoaded, setBirthDate,
   } = useAuth();
   const { leagues, leagueById } = useData();
-  const friends = useFriendships(user.uid).filter((f) => f.status === "accepted");
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ displayName: "", nickname: "", place: {}, birth: "", faculty: "", bio: "", leagueId: "" });
   const [busy, setBusy] = useState(false);
@@ -134,9 +132,6 @@ export default function ProfileScreen({ navigation }) {
             {isOwner && <Badge kind="organization" />}
             <Badge kind={isOrg ? orgStatus ?? "pending" : "personal"} />
           </View>
-          <Text style={common.meta}>
-            {friends.length} friend{friends.length === 1 ? "" : "s"}
-          </Text>
         </View>
 
         <EmailVerificationCard />

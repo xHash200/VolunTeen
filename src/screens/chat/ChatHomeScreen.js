@@ -8,6 +8,7 @@ import {
   removeFriendship,
   useChats,
   useFriendships,
+  useTeamChats,
 } from "../../chat/api";
 import { Avatar, Button, Segmented, SignInPrompt } from "../../components/ui";
 import { common, themed } from "../../theme";
@@ -53,22 +54,35 @@ function ChatRow({ title, subtitle, onPress, onLongPress, right }) {
 }
 
 function GroupsList({ navigation }) {
-  const { user } = useAuth();
+  const { user, isOwner, isStaff } = useAuth();
   const groups = useChats(user.uid).filter((c) => c.type === "group");
+  // Owners / Staff chats, shown only to people with that role.
+  const teamChats = useTeamChats({ isOwner, isStaff });
+  const open = (c) => navigation.navigate("ChatRoom", { chatId: c.id, title: c.name });
+  const preview = (c, fallback) => (c.lastMessage ? `${c.lastSender ?? ""}: ${c.lastMessage}` : fallback);
 
   return (
     <FlatList
       data={groups}
       keyExtractor={(c) => c.id}
       contentContainerStyle={common.list}
-      ListHeaderComponent={<Button title="+ New group" onPress={() => navigation.navigate("NewGroup")} />}
+      ListHeaderComponent={
+        <View style={{ gap: 10 }}>
+          {teamChats.length > 0 && (
+            <>
+              <Text style={common.sectionTitle}>Team</Text>
+              {teamChats.map((c) => (
+                <ChatRow key={c.id} title={c.name} subtitle={preview(c, c.description)} onPress={() => open(c)} />
+              ))}
+              <Text style={common.sectionTitle}>Your groups</Text>
+            </>
+          )}
+          <Button title="+ New group" onPress={() => navigation.navigate("NewGroup")} />
+        </View>
+      }
       ListEmptyComponent={<Text style={common.empty}>No groups yet. Create one with your friends.</Text>}
       renderItem={({ item: c }) => (
-        <ChatRow
-          title={c.name}
-          subtitle={c.lastMessage ? `${c.lastSender ?? ""}: ${c.lastMessage}` : `${c.members.length} members`}
-          onPress={() => navigation.navigate("ChatRoom", { chatId: c.id, title: c.name })}
-        />
+        <ChatRow title={c.name} subtitle={preview(c, `${c.members.length} members`)} onPress={() => open(c)} />
       )}
     />
   );
