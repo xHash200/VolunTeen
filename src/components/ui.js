@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, common, themed } from "../theme";
+import { loadFullPhoto } from "../profile/photo";
 
 // A field you tap to choose one value from a list (opens a full-screen, searchable list).
 export function SelectField({ label, value, options, onChange, placeholder = "Select…", disabled, hint }) {
@@ -66,6 +67,30 @@ export function SelectField({ label, value, options, onChange, placeholder = "Se
         </SafeAreaView>
       </Modal>
     </View>
+  );
+}
+
+// Full-screen view of a profile photo. Shows the normal photo instantly, then swaps in the
+// high-resolution version (if the person has one) once it's downloaded. Tap anywhere to close.
+export function PhotoViewer({ photo, uid, visible, onClose }) {
+  const [full, setFull] = useState(null);
+  useEffect(() => {
+    setFull(null);
+    if (!visible || !uid) return;
+    let alive = true;
+    loadFullPhoto(uid).then((d) => alive && setFull(d));
+    return () => {
+      alive = false;
+    };
+  }, [visible, uid, photo]);
+
+  return (
+    <Modal visible={visible && !!photo} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}>
+        <Image source={{ uri: full || photo }} style={{ width: "92%", aspectRatio: 1, borderRadius: 16 }} resizeMode="contain" />
+        <Text style={{ color: "#bbb", marginTop: 16 }}>Tap to close</Text>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -200,6 +225,7 @@ const BADGES = {
   owner: { label: "Owner", bg: "#d62828", fg: "#ffffff" },
   tester: { label: "Tester", bg: "#ffd60a", fg: "#3d3200" },
   organizer: { label: "Organizer", bg: "#7b2cbf", fg: "#ffffff" },
+  organization: { label: "Organization", bg: "#7b2cbf", fg: "#ffffff" },
   verified: { label: "✓ Verified organization", bg: "#e5f6ec", fg: "#1e8a4c" },
   pending: { label: "Pending verification", get bg() { return colors.warnBg; }, get fg() { return colors.warnText; } },
   rejected: { label: "Verification rejected", bg: "#fdecec", fg: "#c0392b" },

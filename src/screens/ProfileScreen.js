@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import Constants from "expo-constants";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { pickProfilePhoto } from "../profile/photo";
+import { deleteFullPhoto, pickProfilePhoto, saveFullPhoto } from "../profile/photo";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
 import { useFriendships } from "../chat/api";
 import { MIN_AGE, VERIFICATION_CONTACT } from "../config";
-import { Avatar, Badge, Button, Chips, Field, PlaceFields } from "../components/ui";
+import { Avatar, Badge, Button, Chips, Field, PhotoViewer, PlaceFields } from "../components/ui";
 import { citiesOf, countiesOf, COUNTRIES, formatPlace } from "../data/romania";
 import { colors, common, themed, ageFrom, euToIso, maskEuDate } from "../theme";
 
@@ -64,11 +64,15 @@ export default function ProfileScreen({ navigation }) {
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState(false);
   const uploadPhoto = async () => {
     setPhotoBusy(true);
     try {
-      const photo = await pickProfilePhoto();
-      if (photo) await updateProfile({ photo });
+      const picked = await pickProfilePhoto();
+      if (picked) {
+        await saveFullPhoto(user.uid, picked.large); // high-res, only loaded in the full-screen view
+        await updateProfile({ photo: picked.small });
+      }
     } catch (e) {
       Alert.alert("Couldn't set photo", e.message);
     } finally {
@@ -82,7 +86,10 @@ export default function ProfileScreen({ navigation }) {
       {
         text: "Remove photo",
         style: "destructive",
-        onPress: () => updateProfile({ photo: null }).catch((e) => Alert.alert("Couldn't remove photo", e.message)),
+        onPress: () =>
+          Promise.all([updateProfile({ photo: null }), deleteFullPhoto(user.uid)]).catch((e) =>
+            Alert.alert("Couldn't remove photo", e.message)
+          ),
       },
       { text: "Cancel", style: "cancel" },
     ]);
@@ -92,7 +99,13 @@ export default function ProfileScreen({ navigation }) {
     <KeyboardAvoidingView style={common.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={common.list} keyboardShouldPersistTaps="handled">
         <View style={[common.card, { alignItems: "center", gap: 8 }]}>
-          <Pressable onPress={changePhoto} disabled={!editing || photoBusy} style={{ alignItems: "center", gap: 4 }}>
+          <PhotoViewer photo={profile?.photo} uid={user.uid} visible={viewingPhoto} onClose={() => setViewingPhoto(false)} />
+          <Pressable
+            // While editing: change the photo. Otherwise: tap to see it full-screen.
+            onPress={editing ? changePhoto : () => setViewingPhoto(true)}
+            disabled={photoBusy || (!editing && !profile?.photo)}
+            style={{ alignItems: "center", gap: 4 }}
+          >
             <View style={{ opacity: photoBusy ? 0.5 : 1 }}>
               <Avatar name={displayName} size={88} photo={profile?.photo} />
               {photoBusy && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.accent} />}
@@ -106,6 +119,8 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.badges}>
             {isOwner && <Badge kind="owner" />}
             {isTester && <Badge kind="tester" />}
+            {/* Owners can do everything an organization can (create and manage events). */}
+            {isOwner && <Badge kind="organization" />}
             <Badge kind={isOrg ? orgStatus ?? "pending" : "personal"} />
           </View>
           <Text style={common.meta}>

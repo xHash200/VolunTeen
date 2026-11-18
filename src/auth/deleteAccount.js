@@ -53,6 +53,7 @@ export async function deleteMyAccount({ password, jobs, onStep = () => {} }) {
   // 5. Profile (public + private) and organization request.
   onStep("Deleting your profile…");
   await deleteDoc(doc(db, "users", uid, "private", "profile")).catch(() => {});
+  await deleteDoc(doc(db, "users", uid, "photo", "full")).catch(() => {});
   await deleteDoc(doc(db, "orgApplications", uid)).catch(() => {});
   await deleteDoc(doc(db, "users", uid));
 

@@ -131,6 +131,17 @@ service cloud.firestore {
       // Account deletion (the app removes the person's other data first).
       allow delete: if isSelf(uid);
 
+      // High-resolution profile photo (JPEG data URI), loaded only in the full-screen viewer.
+      // Same visibility as the profile; only the owner can change it. Capped below Firestore's 1 MB limit.
+      match /photo/full {
+        allow read: if signedIn();
+        allow write: if isSelf(uid)
+          && request.resource.data.keys().hasOnly(['data'])
+          && request.resource.data.data is string
+          && request.resource.data.data.size() < 900000;
+        allow delete: if isSelf(uid);
+      }
+
       // Birth date: set once (16+), never changed, visible only to the person and staff.
       match /private/profile {
         allow read: if isSelf(uid) || isStaff();

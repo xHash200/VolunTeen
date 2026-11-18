@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useData } from "../../data/DataContext";
-import { Avatar } from "../../components/ui";
+import { Avatar, PhotoViewer } from "../../components/ui";
 import { colors, common } from "../../theme";
 import { formatPlace } from "../../data/romania";
 
@@ -13,6 +13,7 @@ export default function ApplicantProfileScreen({ route }) {
   const { uid, name, status, age } = route.params;
   const { leagueById } = useData();
   const [profile, setProfile] = useState(undefined);
+  const [viewingPhoto, setViewingPhoto] = useState(false);
 
   useEffect(() => {
     if (!db || !uid) return setProfile(null);
@@ -38,7 +39,10 @@ export default function ApplicantProfileScreen({ route }) {
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.list}>
       <View style={[common.card, { alignItems: "center", gap: 8 }]}>
-        <Avatar name={displayName} size={88} photo={profile?.photo} />
+        <Pressable onPress={() => setViewingPhoto(true)} disabled={!profile?.photo}>
+          <Avatar name={displayName} size={88} photo={profile?.photo} />
+        </Pressable>
+        <PhotoViewer photo={profile?.photo} uid={uid} visible={viewingPhoto} onClose={() => setViewingPhoto(false)} />
         <Text style={[common.title, { fontSize: 20 }]}>{displayName}</Text>
         {!!status && <Text style={[common.tag, STATUS_STYLE[status]]}>{STATUS_LABEL[status] ?? status}</Text>}
       </View>
