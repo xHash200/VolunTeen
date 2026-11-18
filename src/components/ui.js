@@ -1,5 +1,102 @@
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, common, themed } from "../theme";
+
+// A field you tap to choose one value from a list (opens a full-screen, searchable list).
+export function SelectField({ label, value, options, onChange, placeholder = "Select…", disabled, hint }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const shown = q ? options.filter((o) => norm(o).includes(norm(q))) : options;
+
+  return (
+    <View style={{ gap: 4 }}>
+      {!!label && <Text style={common.label}>{label}</Text>}
+      <Pressable
+        onPress={() => !disabled && (setQ(""), setOpen(true))}
+        style={[common.input, common.row, { justifyContent: "space-between" }, disabled && { opacity: 0.5 }]}
+      >
+        <Text style={{ fontSize: 15, color: value ? colors.text : colors.muted }}>{value || placeholder}</Text>
+        <Ionicons name="chevron-down" size={18} color={colors.muted} />
+      </Pressable>
+      {!!hint && <Text style={styles.hint}>{hint}</Text>}
+
+      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
+        <SafeAreaView style={common.screen}>
+          <View style={[common.row, { padding: 16, paddingBottom: 8 }]}>
+            <Text style={[common.title, { flex: 1 }]}>{label || placeholder}</Text>
+            <Pressable onPress={() => setOpen(false)} hitSlop={10}>
+              <Ionicons name="close" size={26} color={colors.text} />
+            </Pressable>
+          </View>
+          {options.length > 8 && (
+            <TextInput
+              style={[common.input, { marginHorizontal: 16, marginBottom: 8 }]}
+              placeholder="Search"
+              placeholderTextColor={colors.muted}
+              value={q}
+              onChangeText={setQ}
+              autoCorrect={false}
+            />
+          )}
+          <FlatList
+            data={shown}
+            keyExtractor={(o) => o}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={<Text style={common.empty}>No matches.</Text>}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => {
+                  onChange(item);
+                  setOpen(false);
+                }}
+                style={({ pressed }) => [
+                  common.row,
+                  { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+                  pressed && { backgroundColor: colors.accentSoft },
+                ]}
+              >
+                <Text style={[common.body, { flex: 1 }, item === value && { color: colors.accent, fontWeight: "600" }]}>{item}</Text>
+                {item === value && <Ionicons name="checkmark" size={20} color={colors.accent} />}
+              </Pressable>
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
+    </View>
+  );
+}
+
+// Country → county → city. `value` = { country, county, city }; changing a level clears the ones below it.
+export function PlaceFields({ value, onChange, countries, countiesOf, citiesOf }) {
+  const v = value ?? {};
+  return (
+    <View style={{ gap: 10 }}>
+      <SelectField label="Country" value={v.country} options={countries} onChange={(country) => onChange({ country, county: "", city: "" })} />
+      <SelectField
+        label="County"
+        value={v.county}
+        options={countiesOf(v.country)}
+        disabled={!v.country}
+        placeholder={v.country ? "Select county…" : "Select country first"}
+        onChange={(county) => {
+          const cities = citiesOf(v.country, county);
+          onChange({ ...v, county, city: cities.length === 1 ? cities[0] : "" });
+        }}
+      />
+      <SelectField
+        label="City"
+        value={v.city}
+        options={citiesOf(v.country, v.county)}
+        disabled={!v.county}
+        placeholder={v.county ? "Select city…" : "Select county first"}
+        onChange={(city) => onChange({ ...v, city })}
+      />
+    </View>
+  );
+}
 
 export function Button({ title, onPress, variant = "primary", disabled, loading, small, style }) {
   const v = styles[variant];

@@ -4,7 +4,8 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useData } from "../../data/DataContext";
 import { Avatar } from "../../components/ui";
-import { colors, common } from "../../theme";
+import { ageFrom, colors, common } from "../../theme";
+import { formatPlace } from "../../data/romania";
 
 // Read-only public profile of a job applicant (users/{uid}), opened from JobApplicants.
 export default function ApplicantProfileScreen({ route }) {
@@ -44,6 +45,8 @@ export default function ApplicantProfileScreen({ route }) {
       {profile === null && <Text style={common.meta}>This person hasn't filled in a profile.</Text>}
       {!!profile && (
         <View style={[common.card, { gap: 4 }]}>
+          {row("Age", ageFrom(profile.birthDate)?.toString())}
+          {row("City", formatPlace(profile))}
           {row("Faculty / school", profile.faculty)}
           {row("League", league)}
           {row("About", profile.bio)}

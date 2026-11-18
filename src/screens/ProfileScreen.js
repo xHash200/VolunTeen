@@ -5,9 +5,10 @@ import { pickProfilePhoto } from "../profile/photo";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
 import { useFriendships } from "../chat/api";
-import { VERIFICATION_CONTACT } from "../config";
-import { Avatar, Badge, Button, Chips, Field } from "../components/ui";
-import { colors, common, themed } from "../theme";
+import { MIN_AGE, VERIFICATION_CONTACT } from "../config";
+import { Avatar, Badge, Button, Chips, Field, PlaceFields } from "../components/ui";
+import { citiesOf, countiesOf, COUNTRIES, formatPlace } from "../data/romania";
+import { colors, common, themed, ageFrom, euToIso, maskEuDate } from "../theme";
 
 export default function ProfileScreen({ navigation }) {
   const { user, profile, displayName, isOwner, isTester, isOrganizer, isStaff, accountType, orgStatus, updateProfile, signOut } =
@@ -15,13 +16,18 @@ export default function ProfileScreen({ navigation }) {
   const { leagues, leagueById } = useData();
   const friends = useFriendships(user.uid).filter((f) => f.status === "accepted");
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ displayName: "", faculty: "", bio: "", leagueId: "" });
+  const [form, setForm] = useState({ displayName: "", place: {}, birth: "", faculty: "", bio: "", leagueId: "" });
   const [busy, setBusy] = useState(false);
   const isOrg = accountType === "organization";
+  const age = ageFrom(profile?.birthDate);
+  const canSetBirth = !isOrg && !profile?.birthDate;
 
   useEffect(() => {
     setForm({
       displayName: profile?.displayName ?? displayName,
+      // Older profiles may have a typed city that isn't in the list; they pick again from the list.
+      place: { country: profile?.country || "Romania", county: profile?.county ?? "", city: profile?.county ? profile?.city ?? "" : "" },
+      birth: "",
       faculty: profile?.faculty ?? "",
       bio: profile?.bio ?? "",
       leagueId: profile?.leagueId ?? "",
@@ -30,9 +36,20 @@ export default function ProfileScreen({ navigation }) {
 
   const save = async () => {
     if (!form.displayName.trim()) return Alert.alert("Name can't be empty");
+    // Older accounts can add their date of birth once; after that it's locked (see firestore.rules).
+    const { birth, place, ...rest } = form;
+    if (!isOrg && (!place.county || !place.city)) return Alert.alert("Please select your county and city");
+    const extra = {};
+    if (canSetBirth && birth) {
+      const iso = euToIso(birth);
+      const a = iso && ageFrom(iso);
+      if (!iso || a > 120) return Alert.alert("Please check your date of birth", "Use the format 31.12.2008.");
+      if (a < MIN_AGE) return Alert.alert("Too young", `You need to be at least ${MIN_AGE} to use VolunTeen.`);
+      extra.birthDate = iso;
+    }
     setBusy(true);
     try {
-      await updateProfile({ ...form, displayName: form.displayName.trim() });
+      await updateProfile({ ...rest, ...extra, displayName: form.displayName.trim(), country: place.country ?? "", county: place.county ?? "", city: place.city ?? "" });
       setEditing(false);
     } catch (e) {
       Alert.alert("Couldn't save", e.message);
@@ -99,6 +116,21 @@ export default function ProfileScreen({ navigation }) {
         {editing ? (
           <View style={{ gap: 10 }}>
             <Field label={isOrg ? "Organization name" : "Name"} value={form.displayName} onChangeText={set("displayName")} />
+            {!isOrg &&
+              (canSetBirth ? (
+                <Field
+                  label="Date of birth"
+                  value={form.birth}
+                  onChangeText={(v) => set("birth")(maskEuDate(v))}
+                  placeholder="DD.MM.YYYY"
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  hint="Can only be set once."
+                />
+              ) : (
+                <Text style={common.meta}>Age: {age ?? "—"} · date of birth can't be changed</Text>
+              ))}
+            <PlaceFields value={form.place} onChange={set("place")} countries={COUNTRIES} countiesOf={countiesOf} citiesOf={citiesOf} />
             <Field label="Faculty / school" value={form.faculty} onChangeText={set("faculty")} placeholder="e.g. Automatică și Calculatoare, UPT" />
             <Field
               label={isOrg ? "About the organization" : "About you"}
@@ -120,6 +152,14 @@ export default function ProfileScreen({ navigation }) {
           </View>
         ) : (
           <View style={[common.card, { gap: 4 }]}>
+            {!isOrg && (
+              <>
+                <Text style={common.label}>Age</Text>
+                <Text style={common.body}>{age ?? "—"}</Text>
+              </>
+            )}
+            <Text style={common.label}>City</Text>
+            <Text style={common.body}>{formatPlace(profile) || "—"}</Text>
             <Text style={common.label}>Faculty / school</Text>
             <Text style={common.body}>{profile?.faculty || "—"}</Text>
             <Text style={common.label}>League</Text>

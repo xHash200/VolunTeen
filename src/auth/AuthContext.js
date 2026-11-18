@@ -141,13 +141,18 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const signUpPersonal = withSigningUp(async (email, password, name) => {
+  // extra: { birthDate: "YYYY-MM-DD" (permanent), country, county, city }
+  const signUpPersonal = withSigningUp(async (email, password, name, extra = {}) => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     saveAccount({ uid: cred.user.uid, email: email.trim(), password });
     await setDoc(doc(db, "users", cred.user.uid), {
       displayName: name.trim(),
       displayNameLower: lower(name),
       accountType: "personal",
+      birthDate: extra.birthDate ?? "",
+      country: extra.country ?? "",
+      county: extra.county ?? "",
+      city: extra.city ?? "",
       faculty: "",
       bio: "",
       leagueId: "",

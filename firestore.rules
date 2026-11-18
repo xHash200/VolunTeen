@@ -18,6 +18,11 @@ service cloud.firestore {
     function ownsEvent(eventId) {
       return get(/databases/$(database)/documents/events/$(eventId)).data.get('createdBy', '') == request.auth.uid;
     }
+    // Minimum age 16 (keep in sync with MIN_AGE in src/config.js). bd = "YYYY-MM-DD".
+    function isOldEnough(bd) {
+      return bd is string && bd.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && timestamp.date(int(bd[0:4]) + 16, int(bd[5:7]), int(bd[8:10])) <= request.time;
+    }
     function isMember(data) { return signedIn() && request.auth.uid in data.members; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
@@ -99,12 +104,17 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if signedIn();
       allow create: if isSelf(uid) && (
-        (request.resource.data.accountType == 'personal' && !('orgStatus' in request.resource.data)) ||
+        // Personal: birth date must be 16+ (empty only for profiles auto-created for console-made accounts).
+        (request.resource.data.accountType == 'personal' && !('orgStatus' in request.resource.data)
+          && (request.resource.data.get('birthDate', '') == '' || isOldEnough(request.resource.data.birthDate))) ||
         (request.resource.data.accountType == 'organization' && request.resource.data.orgStatus == 'pending')
       );
+      // birthDate is permanent: it can only be set while it's still empty (older accounts set it once).
       allow update: if
-        (isSelf(uid) && !changed().hasAny(['accountType', 'orgStatus'])) ||
-        (isSelf(uid) && !changed().hasAny(['accountType'])
+        (isSelf(uid) && !changed().hasAny(['accountType', 'orgStatus'])
+          && (!changed().hasAny(['birthDate'])
+            || (resource.data.get('birthDate', '') == '' && isOldEnough(request.resource.data.birthDate)))) ||
+        (isSelf(uid) && !changed().hasAny(['accountType', 'birthDate'])
           && resource.data.orgStatus in ['pending', 'rejected']
           && request.resource.data.orgStatus == 'pending') ||
         (isStaff() && changed().hasOnly(['orgStatus', 'updatedAt']));

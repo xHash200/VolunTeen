@@ -127,6 +127,15 @@ export const euToIso = (eu) => {
   return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 };
 
+// Whole years since an ISO birth date ("YYYY-MM-DD").
+export const ageFrom = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  if (!m) return null;
+  const now = new Date();
+  const [, y, mo, d] = m.map(Number);
+  return now.getFullYear() - y - (now.getMonth() + 1 < mo || (now.getMonth() + 1 === mo && now.getDate() < d) ? 1 : 0);
+};
+
 // Formats digits as DD.MM.YYYY while typing.
 export const maskEuDate = (text) => {
   const digits = text.replace(/\D/g, "").slice(0, 8);
