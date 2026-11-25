@@ -34,10 +34,10 @@ export default function ChatHomeScreen({ navigation }) {
   );
 }
 
-function ChatRow({ title, subtitle, onPress, onLongPress, right }) {
+function ChatRow({ title, subtitle, photo, onPress, onLongPress, right }) {
   return (
     <Pressable style={[common.card, common.row]} onPress={onPress} onLongPress={onLongPress} disabled={!onPress && !onLongPress}>
-      <Avatar name={title} />
+      <Avatar name={title} photo={photo} />
       <View style={{ flex: 1 }}>
         <Text style={common.title} numberOfLines={1}>
           {title}
@@ -55,7 +55,10 @@ function ChatRow({ title, subtitle, onPress, onLongPress, right }) {
 
 function GroupsList({ navigation }) {
   const { user, isOwner, isStaff } = useAuth();
-  const groups = useChats(user.uid).filter((c) => c.type === "group");
+  const chats = useChats(user.uid);
+  const groups = chats.filter((c) => c.type === "group");
+  // Event chats: one per event you're accepted into (or run). See ensureEventChat in chat/api.js.
+  const eventChats = chats.filter((c) => c.type === "event");
   // Owners / Staff chats, shown only to people with that role.
   const teamChats = useTeamChats({ isOwner, isStaff });
   const open = (c) => navigation.navigate("ChatRoom", { chatId: c.id, title: c.name });
@@ -72,17 +75,31 @@ function GroupsList({ navigation }) {
             <>
               <Text style={common.sectionTitle}>Team</Text>
               {teamChats.map((c) => (
-                <ChatRow key={c.id} title={c.name} subtitle={preview(c, c.description)} onPress={() => open(c)} />
+                <ChatRow key={c.id} title={c.name} subtitle={preview(c, c.description)} photo={c.photo} onPress={() => open(c)} />
               ))}
-              <Text style={common.sectionTitle}>Your groups</Text>
             </>
           )}
+          {eventChats.length > 0 && (
+            <>
+              <Text style={common.sectionTitle}>Events</Text>
+              {eventChats.map((c) => (
+                <ChatRow
+                  key={c.id}
+                  title={c.name}
+                  subtitle={preview(c, `${c.members.length} member${c.members.length === 1 ? "" : "s"}`)}
+                  photo={c.photo}
+                  onPress={() => open(c)}
+                />
+              ))}
+            </>
+          )}
+          {(teamChats.length > 0 || eventChats.length > 0) && <Text style={common.sectionTitle}>Your groups</Text>}
           <Button title="+ New group" onPress={() => navigation.navigate("NewGroup")} />
         </View>
       }
       ListEmptyComponent={<Text style={common.empty}>No groups yet. Create one with your friends.</Text>}
       renderItem={({ item: c }) => (
-        <ChatRow title={c.name} subtitle={preview(c, `${c.members.length} members`)} onPress={() => open(c)} />
+        <ChatRow title={c.name} subtitle={preview(c, `${c.members.length} members`)} photo={c.photo} onPress={() => open(c)} />
       )}
     />
   );

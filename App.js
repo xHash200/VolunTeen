@@ -23,6 +23,7 @@ import ChatHomeScreen from "./src/screens/chat/ChatHomeScreen";
 import ChatRoomScreen from "./src/screens/chat/ChatRoomScreen";
 import ChatInfoScreen from "./src/screens/chat/ChatInfoScreen";
 import NewGroupScreen from "./src/screens/chat/NewGroupScreen";
+import AddMembersScreen from "./src/screens/chat/AddMembersScreen";
 import AddFriendScreen from "./src/screens/chat/AddFriendScreen";
 import AdminHomeScreen from "./src/screens/admin/AdminHomeScreen";
 import OrgReviewScreen from "./src/screens/admin/OrgReviewScreen";
@@ -93,6 +94,7 @@ const ChatStack = stack([
   ["ChatInfo", ChatInfoScreen, { title: "Group info", headerTitleAlign: "center" }],
   ["UserProfile", ApplicantProfileScreen, ({ route }) => ({ title: route.params?.name ?? "Profile", headerTitleAlign: "center" })],
   ["NewGroup", NewGroupScreen, { title: "New group" }],
+  ["AddMembers", AddMembersScreen, { title: "Add people" }],
   ["AddFriend", AddFriendScreen, { title: "Add friend" }],
 ]);
 const ProfileStack = stack([

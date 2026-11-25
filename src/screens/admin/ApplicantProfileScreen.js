@@ -5,6 +5,7 @@ import { db } from "../../firebase";
 import { useData } from "../../data/DataContext";
 import { Avatar, PhotoViewer } from "../../components/ui";
 import { NameWithTag, useRoleTagOf } from "../../components/RoleTag";
+import VolunteerHoursCard from "../../components/VolunteerHours";
 import { colors, common } from "../../theme";
 import { formatPlace } from "../../data/romania";
 
@@ -60,6 +61,7 @@ export default function ApplicantProfileScreen({ route }) {
           {row("About", profile.bio)}
         </View>
       )}
+      {!!profile && profile.accountType !== "organization" && <VolunteerHoursCard uid={uid} />}
     </ScrollView>
   );
 }

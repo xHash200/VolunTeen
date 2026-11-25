@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { collection, doc, increment, onSnapshot, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, increment, onSnapshot, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 import { ORGANIZER_CATEGORY } from "../config";
+import { attendanceRef } from "../attendance/api";
+import { joinEventChat, leaveEventRole } from "../chat/api";
 
 // Firestore layout:
 //   jobs/{jobId}/applications/{uid}  { uid, name, status: pending|accepted|declined, appliedAt, reviewedBy, reviewedAt }
@@ -79,10 +81,24 @@ export async function withdrawApplication(job, uid, wasAccepted) {
     if (isOrganizerRole(job) && job.eventId) batch.delete(helperRef(job.eventId, uid));
   }
   await batch.commit();
+  // Leaves the event chat unless they're still accepted in another of the event's roles.
+  if (wasAccepted && job.eventId) {
+    await leaveEventRole(job.eventId, String(job.id), uid).catch((e) => console.warn("Event chat update failed:", e.message));
+  }
 }
 
 // Organizer decision. Keeps jobs/{jobId}.acceptedCount and event-helper access in step with accepted applications.
-export async function setApplicationStatus(job, app, status, reviewerUid) {
+async function syncChatAfterDecision(job, app, delta, event) {
+  if (delta > 0) {
+    const ev = event ?? (await getDoc(doc(db, "events", job.eventId))).data();
+    if (ev) await joinEventChat({ id: job.eventId, ...ev }, String(job.id), { id: app.id, name: app.name });
+  } else {
+    await leaveEventRole(job.eventId, String(job.id), app.id);
+  }
+}
+
+// `event` (optional): the role's event, so the event chat can be created without another read.
+export async function setApplicationStatus(job, app, status, reviewerUid, event = null) {
   const batch = writeBatch(db);
   batch.update(appRef(job.id, app.id), { status, reviewedBy: reviewerUid, reviewedAt: serverTimestamp() });
   const delta = (status === "accepted" ? 1 : 0) - (app.status === "accepted" ? 1 : 0);
@@ -91,7 +107,13 @@ export async function setApplicationStatus(job, app, status, reviewerUid) {
     if (delta > 0) batch.set(helperRef(job.eventId, app.id), { eventId: job.eventId, uid: app.id, name: app.name ?? "", jobId: String(job.id) });
     else batch.delete(helperRef(job.eventId, app.id));
   }
+  // No longer accepted → their attendance mark for this role goes too (only accepted volunteers have hours).
+  if (delta < 0) batch.delete(attendanceRef(job.id, app.id));
   await batch.commit();
+  // Event group chat: accepted volunteers are in it. Best effort — the decision above is what matters.
+  if (delta && job.eventId) {
+    syncChatAfterDecision(job, app, delta, event).catch((e) => console.warn("Event chat update failed:", e.message));
+  }
 }
 
 // Self-heal the public counter from the real list (organizer view).

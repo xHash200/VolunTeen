@@ -37,6 +37,9 @@ export async function deleteMyAccount({ password, jobs, onStep = () => {} }) {
   }
   const helperDocs = await getDocs(query(collection(db, "eventHelpers"), where("uid", "==", uid)));
   await Promise.all(helperDocs.docs.map((d) => deleteDoc(d.ref)));
+  // Verified hours (attendance marks) about this person.
+  const attendance = await getDocs(query(collection(db, "attendance"), where("uid", "==", uid))).catch(() => null);
+  await Promise.all((attendance?.docs ?? []).map((d) => deleteDoc(d.ref)));
 
   // 3. Friends.
   onStep("Removing friends…");

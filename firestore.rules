@@ -105,6 +105,34 @@ service cloud.firestore {
       }
     }
 
+    // Verified volunteer hours: attendance/{jobId_uid}. Marked by whoever manages the role's applicants
+    // (event's organization, staff, event helpers for non-Organizer roles), only for accepted volunteers.
+    // Readable by signed-in users (shown on profiles). The volunteer can delete theirs (account deletion).
+    match /attendance/{id} {
+      function jobData(jobId) { return get(/databases/$(database)/documents/jobs/$(jobId)).data; }
+      function canMarkJob(jobId) {
+        return isStaff()
+          || (isOrganizer() && ownsEvent(jobData(jobId).get('eventId', '')))
+          || (isEventHelper(jobData(jobId).get('eventId', '')) && jobData(jobId).get('category', '') != 'Organizer');
+      }
+      function validAttendance() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'jobId', 'eventId', 'attended', 'hours', 'eventTitle', 'roleTitle', 'date', 'orgName', 'markedBy', 'markedAt'])
+          && d.jobId is string && d.uid is string
+          && id == d.jobId + '_' + d.uid
+          && d.eventId == jobData(d.jobId).get('eventId', '')
+          && d.markedBy == request.auth.uid
+          && d.hours is number
+          // Max hours per role: keep in sync with MAX_HOURS in src/attendance/api.js.
+          && ((d.attended == true && d.hours > 0 && d.hours <= 250) || (d.attended == false && d.hours == 0))
+          && get(/databases/$(database)/documents/jobs/$(d.jobId)/applications/$(d.uid)).data.get('status', '') == 'accepted';
+      }
+      allow read: if signedIn();
+      allow create, update: if signedIn() && canMarkJob(request.resource.data.jobId) && validAttendance();
+      // resource == null: deleting a mark that doesn't exist (e.g. declining someone who was never marked) is a no-op.
+      allow delete: if signedIn() && (resource == null || isSelf(resource.data.uid) || canMarkJob(resource.data.jobId));
+    }
+
     // eventHelpers/{eventId_uid} { eventId, uid, name, jobId }: written when someone is accepted into
     // (or leaves) an "Organizer" role. Only the event's organization or staff grant it; the helper can drop it.
     match /eventHelpers/{helperId} {
@@ -234,24 +262,64 @@ service cloud.firestore {
       return (isTeamChat(chatId) && inTeamChat(chatId)) || (!isTeamChat(chatId) && isMember(chatData(chatId)));
     }
 
-    // Chats (direct + group) and their messages: members only. Team chats: by role (above).
+    // Event chats: chats/event_<eventId>. Run by the event's organization, staff and the event's helpers.
+    function isEventChat(chatId) { return chatId.matches('event_[A-Za-z0-9_-]+'); }
+    function eventOfChat(chatId) { return chatId[6:chatId.size()]; }
+    function canManageEventChat(chatId) {
+      return isStaff() || ownsEvent(eventOfChat(chatId)) || isEventHelper(eventOfChat(chatId));
+    }
+    // Group admins: rename, photo, description, add/remove members. Group chats: the creator.
+    function isChatAdmin(chatId) {
+      return (isEventChat(chatId) && canManageEventChat(chatId))
+        || (!isEventChat(chatId) && resource.data.get('type', '') == 'group' && resource.data.get('createdBy', '') == request.auth.uid);
+    }
+    // What an admin may set: a short name and a small photo; type, creator and event can't change.
+    function validChatEdit() {
+      let d = request.resource.data;
+      return d.get('type', '') == resource.data.get('type', '')
+        && d.get('createdBy', '') == resource.data.get('createdBy', '')
+        && d.get('eventId', '') == resource.data.get('eventId', '')
+        && (!('name' in d) || (d.name is string && d.name.size() <= 50))
+        && (!('photo' in d) || (d.photo is string && d.photo.size() < 200000))
+        && (!('description' in d) || (d.description is string && d.description.size() <= 300));
+    }
+    // A member taking only themselves out (members, their memberNames / memberRoles / removed entries).
+    function leavingSelf() {
+      return changed().hasOnly(['members', 'memberNames', 'memberRoles', 'removed'])
+        && request.resource.data.members.toSet() == resource.data.members.toSet().difference([request.auth.uid].toSet())
+        && request.resource.data.get('memberNames', {}).diff(resource.data.get('memberNames', {})).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.get('memberRoles', {}).diff(resource.data.get('memberRoles', {})).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.get('removed', {}).diff(resource.data.get('removed', {})).affectedKeys().hasOnly([request.auth.uid]);
+    }
+    // A member updating only their own memberRoles entry (withdrew from one role, still in another).
+    function ownRolesOnly() {
+      return changed().hasOnly(['memberRoles'])
+        && request.resource.data.memberRoles.diff(resource.data.get('memberRoles', {})).affectedKeys().hasOnly([request.auth.uid]);
+    }
+
+    // Chats (direct, group, event) and their messages: members only. Team chats: by role (above).
     match /chats/{chatId} {
       allow get: if signedIn() && ((isTeamChat(chatId) && inTeamChat(chatId))
-        || (!isTeamChat(chatId) && (resource == null || isMember(resource.data))));
+        || (!isTeamChat(chatId) && (resource == null || isMember(resource.data)
+          || (isEventChat(chatId) && canManageEventChat(chatId)))));
       allow list: if signedIn() && isMember(resource.data);
       allow create: if (isTeamChat(chatId) && inTeamChat(chatId)
           && request.resource.data.type == 'team'
           && request.resource.data.keys().hasOnly(['type', 'name', 'lastMessage', 'lastSender', 'createdAt', 'updatedAt']))
-        || (!isTeamChat(chatId) && isMember(request.resource.data)
+        || (isEventChat(chatId) && signedIn() && canManageEventChat(chatId)
+          && request.resource.data.type == 'event' && request.resource.data.eventId == eventOfChat(chatId))
+        || (!isTeamChat(chatId) && !isEventChat(chatId) && isMember(request.resource.data)
+          && request.resource.data.get('type', '') != 'event'
           && ownNameOk(request.resource.data.get('memberNames', {})));
-      // lastSender = the writer's real name. In memberNames you can only touch your own entry
-      // (leaving removes it; if present it must be your real name).
-      allow update: if (!changed().hasAny(['lastSender']) || request.resource.data.lastSender == myName()) && (
+      // lastSender = the writer's real name. Admins edit the group (their own memberNames entry must be
+      // their real name); everyone else may only post (last message) or leave.
+      allow update: if signedIn() && (!changed().hasAny(['lastSender']) || request.resource.data.lastSender == myName()) && (
         (isTeamChat(chatId) && inTeamChat(chatId) && changed().hasOnly(['lastMessage', 'lastSender', 'updatedAt']))
+        || (!isTeamChat(chatId) && isChatAdmin(chatId) && validChatEdit()
+          && (!request.resource.data.get('memberNames', {}).diff(resource.data.get('memberNames', {})).affectedKeys().hasAny([request.auth.uid])
+            || ownNameOk(request.resource.data.get('memberNames', {}))))
         || (!isTeamChat(chatId) && isMember(resource.data)
-          && (!changed().hasAny(['memberNames'])
-            || (request.resource.data.get('memberNames', {}).diff(resource.data.get('memberNames', {})).affectedKeys().hasOnly([request.auth.uid])
-              && ownNameOk(request.resource.data.get('memberNames', {}))))));
+          && (changed().hasOnly(['lastMessage', 'lastSender', 'updatedAt']) || leavingSelf() || ownRolesOnly())));
 
       match /messages/{messageId} {
         allow read: if canUseChat(chatId);

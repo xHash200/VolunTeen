@@ -27,7 +27,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "seed": "node --env-file=.env.local scripts/seed.mjs"
+    "seed": "node --env-file=.env.local scripts/seed.mjs",
+    "test-students": "node --env-file=.env.local scripts/test-students.mjs"
   },
   "private": true
 }

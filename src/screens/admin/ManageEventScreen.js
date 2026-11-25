@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { addGroupMembers, ensureEventChat, eventChatId } from "../../chat/api";
 import { useAuth } from "../../auth/AuthContext";
 import { organizerOf, sortRoles } from "../../admin/contentSchemas";
 import { useData } from "../../data/DataContext";
@@ -10,7 +11,7 @@ import { colors, common, formatDate } from "../../theme";
 // event helpers (accepted "Organizer"s) only open roles to review applicants.
 export default function ManageEventScreen({ route, navigation }) {
   const { eventById, jobs, leagueById } = useData();
-  const { canEditEvent, canReviewEvent } = useAuth();
+  const { user, displayName, canEditEvent, canReviewEvent } = useAuth();
   const event = eventById[route.params.eventId];
 
   if (!event) return <Text style={common.empty}>This event no longer exists.</Text>;
@@ -45,6 +46,28 @@ export default function ManageEventScreen({ route, navigation }) {
           </Text>
         )}
       </View>
+
+      {/* The event's group chat (organization + everyone accepted). Created here if nobody's been accepted yet. */}
+      <Button
+        variant="secondary"
+        title="💬 Event chat"
+        onPress={() =>
+          ensureEventChat(event)
+            // Staff/helpers who aren't in it yet join, so they can read and write.
+            .then(async (chat) => {
+              if (!chat.members?.includes(user.uid)) await addGroupMembers(eventChatId(event.id), [{ id: user.uid, name: displayName }]);
+              return chat;
+            })
+            .then((chat) =>
+              navigation.navigate("ChatTab", {
+                screen: "ChatRoom",
+                params: { chatId: eventChatId(event.id), title: chat.name },
+                initial: false,
+              })
+            )
+            .catch((e) => Alert.alert("Couldn't open the event chat", e.message))
+        }
+      />
 
       <Text style={common.sectionTitle}>
         Volunteer roles ({roles.length}) · {totalSpots} spots

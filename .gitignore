@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 
+# test account logins (scripts/test-students.mjs)
+scripts/*.local.json
+
 # typescript
 *.tsbuildinfo
 

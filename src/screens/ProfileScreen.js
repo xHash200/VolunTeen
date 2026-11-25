@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Sc
 import { deleteFullPhoto, pickProfilePhoto, saveFullPhoto } from "../profile/photo";
 import { Ionicons } from "@expo/vector-icons";
 import { NameWithTag, tagFor } from "../components/RoleTag";
+import VolunteerHoursCard from "../components/VolunteerHours";
 import { nameError } from "../profile/names";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
@@ -210,6 +211,8 @@ export default function ProfileScreen({ navigation }) {
             <Button title="Edit profile" variant="secondary" onPress={() => setEditing(true)} style={{ marginTop: 12 }} />
           </View>
         )}
+
+        {!isOrg && !editing && <VolunteerHoursCard uid={user.uid} mine />}
 
         {isStaff && <DebugCard />}
 

@@ -36,6 +36,16 @@ export async function pickProfilePhoto() {
   return { small, large };
 }
 
+// Group/event chat picture: one 256px square JPEG data URI (~10–25 KB) on chats/{id}.photo, since every
+// member's chat list loads it. Returns the data URI, or null if they cancel.
+export async function pickGroupPhoto() {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) throw new Error("Allow access to your photos to set a group picture.");
+  const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 1 });
+  if (res.canceled || !res.assets?.length) return null;
+  return render(res.assets[0].uri, 256, 0.6);
+}
+
 const fullRef = (uid) => doc(db, "users", uid, "photo", "full");
 
 export const saveFullPhoto = (uid, data) => setDoc(fullRef(uid), { data });

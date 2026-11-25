@@ -6,7 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useAuth } from "../../auth/AuthContext";
-import { sendMessage, useMessages } from "../../chat/api";
+import { sendMessage, useChat, useMessages } from "../../chat/api";
+import { Avatar } from "../../components/ui";
 import { colors, common, themed } from "../../theme";
 
 const timeOf = (ts) => {
@@ -17,10 +18,21 @@ const timeOf = (ts) => {
 export default function ChatRoomScreen({ route, navigation }) {
   const { chatId } = route.params;
   const { user, displayName } = useAuth();
-  // ⋮ → Group info (members, roles, description). Group and team chats only, not direct messages.
+  const chat = useChat(chatId.startsWith("dm_") ? null : chatId);
+  // Group, event and team chats: the header shows the group's picture + current name; tapping it (or ⋮)
+  // opens Group info (members, roles, description). Not for direct messages.
   useLayoutEffect(() => {
     if (chatId.startsWith("dm_")) return;
+    const openInfo = () => navigation.navigate("ChatInfo", { chatId });
     navigation.setOptions({
+      headerTitle: () => (
+        <Pressable onPress={openInfo} style={styles.headerTitle} accessibilityRole="button" accessibilityLabel="Group info">
+          <Avatar name={chat?.name ?? route.params?.title ?? "Chat"} size={30} photo={chat?.photo} />
+          <Text style={styles.headerText} numberOfLines={1}>
+            {chat?.name ?? route.params?.title ?? "Chat"}
+          </Text>
+        </Pressable>
+      ),
       headerRight: () => (
         <Pressable
           onPress={() => navigation.navigate("ChatInfo", { chatId })}
@@ -31,7 +43,7 @@ export default function ChatRoomScreen({ route, navigation }) {
         </Pressable>
       ),
     });
-  }, [navigation, chatId]);
+  }, [navigation, chatId, chat?.name, chat?.photo]);
   const messages = useMessages(chatId);
   const [text, setText] = useState("");
   const headerHeight = useHeaderHeight();
@@ -125,6 +137,8 @@ function SenderLabel({ uid, fallback }) {
 
 const styles = themed((colors) => StyleSheet.create({
   empty: { ...StyleSheet.absoluteFillObject, bottom: 70, alignItems: "center", justifyContent: "center" },
+  headerTitle: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: 240 },
+  headerText: { fontSize: 17, fontWeight: "600", color: colors.text, flexShrink: 1 },
   bubble: { maxWidth: "80%", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
   mine: { alignSelf: "flex-end", backgroundColor: colors.accent, borderBottomRightRadius: 4 },
   theirs: { alignSelf: "flex-start", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
