@@ -43,7 +43,14 @@ service cloud.firestore {
 
     // Public content — readable by anyone. Staff can edit everything;
     // organizers can create events and manage only their own events and those events' roles.
-    match /leagues/{id} { allow read: if true; allow write: if isStaff(); }
+    // orgUid = the verified "Student league" organization that claimed this league (set by staff on approval).
+    // That organization may only release its own claim (account deletion), nothing else.
+    match /leagues/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+      allow update: if signedIn() && resource.data.get('orgUid', '') == request.auth.uid
+        && changed().hasOnly(['orgUid']) && !('orgUid' in request.resource.data);
+    }
 
     match /events/{id} {
       allow read: if true;

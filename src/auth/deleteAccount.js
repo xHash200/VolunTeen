@@ -50,8 +50,10 @@ export async function deleteMyAccount({ password, jobs, onStep = () => {} }) {
     chats.docs.map((d) => updateDoc(d.ref, { members: arrayRemove(uid), [`memberNames.${uid}`]: deleteField() }))
   );
 
-  // 5. Profile (public + private) and organization request.
+  // 5. Profile (public + private), organization request and any league this organization claimed.
   onStep("Deleting your profile…");
+  const claimed = await getDocs(query(collection(db, "leagues"), where("orgUid", "==", uid))).catch(() => null);
+  await Promise.all((claimed?.docs ?? []).map((d) => updateDoc(d.ref, { orgUid: deleteField() })));
   await deleteDoc(doc(db, "users", uid, "private", "profile")).catch(() => {});
   await deleteDoc(doc(db, "users", uid, "photo", "full")).catch(() => {});
   await deleteDoc(doc(db, "orgApplications", uid)).catch(() => {});

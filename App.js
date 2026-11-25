@@ -83,7 +83,10 @@ const contentEdit = [
 ];
 
 const EventsStack = stack([["Events", EventsScreen], ["EventDetail", EventDetailScreen, { title: "Event" }], jobDetail]);
-const LeaguesStack = stack([["LeaguesList", LeaguesScreen, { title: "Leagues" }]]);
+const LeaguesStack = stack([
+  ["LeaguesList", LeaguesScreen, { title: "Leagues" }],
+  ["UserProfile", ApplicantProfileScreen, ({ route }) => ({ title: route.params?.name ?? "Profile", headerTitleAlign: "center" })],
+]);
 const ChatStack = stack([
   ["ChatHome", ChatHomeScreen, { title: "Chat" }],
   ["ChatRoom", ChatRoomScreen, ({ route }) => ({ title: route.params?.title ?? "Chat", headerTitleAlign: "center" })],

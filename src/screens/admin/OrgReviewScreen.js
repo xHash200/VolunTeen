@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
-import { approveOrg, rejectOrg, useApplication } from "../../admin/api";
+import { approveOrg, claimFor, claimLeague, rejectOrg, unclaimLeague, useApplication } from "../../admin/api";
 import { useData } from "../../data/DataContext";
+import { useVerifiedOrgs } from "../../data/orgs";
+import { STUDENT_LEAGUE } from "../../config";
 import { Badge, Button, Field } from "../../components/ui";
 import { colors, common, themed } from "../../theme";
 
@@ -13,6 +15,7 @@ export default function OrgReviewScreen({ route }) {
   const { user } = useAuth();
   const { leagueById } = useData();
   const app = useApplication(uid);
+  const orgs = useVerifiedOrgs();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(null);
 
@@ -31,7 +34,25 @@ export default function OrgReviewScreen({ route }) {
     }
   };
 
-  const approve = run("approve", () => approveOrg(uid, user.uid));
+  // League claiming: a "Student league" organization takes over the league it picked, if no one else has.
+  const claim = claimFor(app, leagueById);
+  const holder = claim.state === "taken" ? orgs.find((o) => o.id === claim.league.orgUid) : null;
+  const claimText = {
+    free:
+      app.status === "verified"
+        ? `${claim.league?.name} isn't linked to this account yet.`
+        : `Approving links ${claim.league?.name} to this account: it shows as verified and "Managed by" them.`,
+    mine: `${claim.league?.name} is managed by this account.`,
+    taken: `${claim.league?.name} is already managed by ${holder?.displayName ?? "another account"}. Approving won't link it — unlink it there first if this is the real league.`,
+  }[claim.state];
+  const claimLeagueId = claim.state === "free" || claim.state === "mine" ? claim.league.id : null;
+
+  const approve = run("approve", () => approveOrg(uid, user.uid, claimLeagueId));
+  const unlink = () =>
+    Alert.alert("Unlink league?", `${claim.league.name} will no longer be managed by ${app.orgName}.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unlink", style: "destructive", onPress: run("unlink", () => unclaimLeague(claim.league.id)) },
+    ]);
   const reject = () => {
     if (!reason.trim()) return Alert.alert("Add a reason", "Tell the organization why, so they can fix it.");
     run("reject", () => rejectOrg(uid, user.uid, reason))();
@@ -70,6 +91,24 @@ export default function OrgReviewScreen({ route }) {
         {row("University", app.university)}
         {row("Faculty", app.faculty)}
         {row("Claims to be league", leagueById[app.leagueId]?.name)}
+        {!!claimText && (
+          <Text style={[common.meta, claim.state === "taken" && styles.warn]}>{claimText}</Text>
+        )}
+        {/* Organizations approved before claiming existed: link without re-approving. */}
+        {claim.state === "free" && app.status === "verified" && (
+          <Button
+            title={`Link ${claim.league.name}`}
+            variant="secondary"
+            onPress={run("link", () => claimLeague(claim.league.id, uid))}
+            loading={busy === "link"}
+          />
+        )}
+        {claim.state === "mine" && (
+          <Button title="Unlink league" variant="secondary" onPress={unlink} loading={busy === "unlink"} />
+        )}
+        {app.orgType !== STUDENT_LEAGUE && !!app.leagueId && (
+          <Text style={common.meta}>Only "{STUDENT_LEAGUE}" organizations take over a league; this one just mentions it.</Text>
+        )}
         {row("Website", app.website, app.website && withScheme(app.website))}
         {row("Social page", app.socialUrl, app.socialUrl && withScheme(app.socialUrl))}
         {row("Notes", app.notes)}
@@ -113,5 +152,6 @@ export default function OrgReviewScreen({ route }) {
 
 const styles = themed((colors) => StyleSheet.create({
   link: { color: colors.accent },
+  warn: { color: colors.warnText },
   code: { fontSize: 24, fontWeight: "800", letterSpacing: 2, textAlign: "center", color: colors.text },
 }));

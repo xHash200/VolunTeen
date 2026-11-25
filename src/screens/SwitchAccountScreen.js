@@ -6,6 +6,7 @@ import { db } from "../firebase";
 import { useAuth } from "../auth/AuthContext";
 import { forgetAccount, listSavedAccounts, updateSavedAccountInfo } from "../auth/savedAccounts";
 import { Avatar, Button, Field } from "../components/ui";
+import { TAGS } from "../components/RoleTag";
 import { colors, common } from "../theme";
 
 const ROLE_LABEL = { owner: "Owner account", admin: "Admin account", tester: "Tester account", organization: "Organization" };
@@ -116,7 +117,10 @@ export default function SwitchAccountScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <Text style={common.title}>{shownName(a)}</Text>
               <Text style={common.meta}>{a.email}</Text>
-              <Text style={[common.meta, { fontSize: 12 }, a.role === "owner" && { color: "#d62828", fontWeight: "700" }]}>{label(a)}</Text>
+              {/* Role label in its tag color: owner red, admin orange, tester yellow, verified organization purple. */}
+              <Text style={[common.meta, { fontSize: 12 }, TAGS[a.role] && { color: TAGS[a.role].color, fontWeight: "700" }]}>
+                {label(a)}
+              </Text>
             </View>
             {current ? (
               <Text style={{ color: colors.accent, fontWeight: "700" }}>✓ Current</Text>

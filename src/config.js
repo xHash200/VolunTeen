@@ -12,4 +12,6 @@ export const MIN_AGE = 16;
 export const ORGANIZER_CATEGORY = "Organizer";
 export const ROLE_CATEGORIES = [ORGANIZER_CATEGORY, "Logistics", "Tehnic", "Media / PR", "Event support", "Other"];
 
-export const ORG_TYPES =["Student league", "Student organization", "NGO", "Other"];
+// Organizations of this type claim the league they picked when they're approved (leagues.orgUid).
+export const STUDENT_LEAGUE = "Student league";
+export const ORG_TYPES = [STUDENT_LEAGUE, "Student organization", "NGO", "Other"];

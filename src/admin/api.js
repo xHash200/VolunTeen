@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "../firebase";
+import { STUDENT_LEAGUE } from "../config";
 
 const millis = (ts) => ts?.toMillis?.() ?? Date.now();
 
@@ -35,7 +50,21 @@ export function useApplication(uid) {
   return app;
 }
 
-async function reviewOrg(uid, reviewerUid, status, rejectReason = "") {
+// ---------- League claiming ----------
+// A verified organization of type "Student league" that picked a league at sign-up "claims" it:
+// leagues/{id}.orgUid = its uid. The league then shows as verified and "Managed by" that account, and
+// the organization isn't listed a second time under Verified organizations. One account per league.
+
+// Which league (if any) this application would claim, and whether it's free.
+// `leagueById` from useData. Returns { league, state: "none" | "free" | "mine" | "taken" }.
+export function claimFor(app, leagueById) {
+  const league = app?.orgType === STUDENT_LEAGUE ? leagueById?.[app.leagueId] : null;
+  if (!league) return { league: null, state: "none" };
+  if (!league.orgUid) return { league, state: "free" };
+  return { league, state: league.orgUid === app.uid ? "mine" : "taken" };
+}
+
+async function reviewOrg(uid, reviewerUid, status, rejectReason = "", claimLeagueId = null) {
   const batch = writeBatch(db);
   batch.update(doc(db, "orgApplications", uid), {
     status,
@@ -44,11 +73,20 @@ async function reviewOrg(uid, reviewerUid, status, rejectReason = "") {
     reviewedAt: serverTimestamp(),
   });
   batch.update(doc(db, "users", uid), { orgStatus: status, updatedAt: serverTimestamp() });
+  // Drop any league this account held before (rejected/revoked, or it now claims a different one), then claim.
+  const held = await getDocs(query(collection(db, "leagues"), where("orgUid", "==", uid)));
+  for (const d of held.docs) if (d.id !== claimLeagueId) batch.update(d.ref, { orgUid: deleteField() });
+  if (claimLeagueId) batch.update(doc(db, "leagues", claimLeagueId), { orgUid: uid });
   await batch.commit();
 }
 
-export const approveOrg = (uid, reviewerUid) => reviewOrg(uid, reviewerUid, "verified");
+// `claimLeagueId`: the league to link (only when claimFor(...) says "free" or "mine").
+export const approveOrg = (uid, reviewerUid, claimLeagueId = null) => reviewOrg(uid, reviewerUid, "verified", "", claimLeagueId);
 export const rejectOrg = (uid, reviewerUid, reason) => reviewOrg(uid, reviewerUid, "rejected", reason.trim());
+// Staff: link a league to an already-verified organization (approved before claiming existed).
+export const claimLeague = (leagueId, orgUid) => updateDoc(doc(db, "leagues", leagueId), { orgUid });
+// Staff: unlink a league from its organization (e.g. claimed by mistake).
+export const unclaimLeague = (leagueId) => updateDoc(doc(db, "leagues", leagueId), { orgUid: deleteField() });
 
 // ---------- Team (owners + admins + testers) ----------
 

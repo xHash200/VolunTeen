@@ -56,7 +56,10 @@ export const CONTENT_TYPES = {
     label: "League",
     plural: "Leagues",
     titleKey: "name",
-    subtitle: (l) => [l.university, l.verified ? "verified" : "not verified"].filter(Boolean).join(" · "),
+    subtitle: (l) =>
+      [l.university, l.orgUid ? "claimed by its organization" : l.verified ? "verified" : "not verified"]
+        .filter(Boolean)
+        .join(" · "),
     fields: [
       { key: "name", label: "Short name", type: "text", required: true, placeholder: "e.g. LSAC Timișoara" },
       { key: "fullName", label: "Full name", type: "text" },

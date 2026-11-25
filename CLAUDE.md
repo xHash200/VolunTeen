@@ -22,6 +22,8 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 - **organization = organizer**: only verified organizations (`isOrganizer` = `orgStatus == "verified"`) create events and manage their roles + applicants (`events.createdBy`, rules `ownsEvent()`). Tab titled "My events". There is no separate organizer team role anymore.
 - **event helper**: a volunteer accepted into an event role whose `category` is `"Organizer"` (`ORGANIZER_CATEGORY` in `src/config.js`). Gets `eventHelpers/{eventId_uid}`, the "My events" tab ("Events I help organize") and can accept/decline applicants for that event's other roles, not edit the event/roles and not pick other Organizers.
 - `isStaff` (useAuth + rules) = owner, admin or tester. `canManageTeam` = owner or admin. `canManageEvents` = staff or organization. `canEditEvent(event)` = staff or creator. `canReviewEvent(event)` = canEditEvent or helper.
+- **Leagues tab** (`LeaguesScreen`): two sections — Student leagues (`leagues`) and Verified organizations (`useVerifiedOrgs` in `src/data/orgs.js`, live `users` query accountType organization + orgStatus verified), each with the ORG pill and event count; tap → UserProfile.
+- **League claiming**: a league and its organization account are one thing. An org of type `STUDENT_LEAGUE` ("Student league", `src/config.js`) that picked a league claims it when approved: `leagues/{id}.orgUid = uid` (`claimFor` / `approveOrg(uid, reviewer, claimLeagueId)` / `claimLeague` / `unclaimLeague` in `src/admin/api.js`). One account per league — OrgReview warns if it's taken. Revoking/rejecting drops the claim; account deletion releases it (rules let the org only remove its own `orgUid`). A claimed league counts as verified, shows "Managed by" the org, and that org isn't repeated under Verified organizations. Claims by accounts that aren't verified right now are ignored in the UI. Events still belong to the org account (`createdBy`); there is no separate league account.
 - Public Events/Jobs tabs are read-only; all event management lives in the Admin/My events tab (Events section → ManageEvent → JobApplicants / ContentEdit).
 - Role categories (pick-list): `ROLE_CATEGORIES` in `src/config.js`. Organizer roles are sorted first and highlighted (`sortRoles`).
 - `src/config.js` — `VERIFICATION_CONTACT` (where orgs send the code), org types.
@@ -41,7 +43,7 @@ Stack: React Native + Expo (SDK 58, Expo Go / EAS Build), Firebase (Auth email/p
 
 ## Data model (Firestore)
 
-- `leagues/{id}`: name, fullName, university, faculty, description, website, verified
+- `leagues/{id}`: name, fullName, university, faculty, description, website, verified, orgUid (claiming organization, optional)
 - `events/{id}`: title, leagueId (optional), date (YYYY-MM-DD), time, location, category, description, createdBy, organizerName
 - `jobs/{id}`: title, event, eventId, leagueId, date, location, spots, hours, category, description, requirements[], perks[], createdBy, acceptedCount
 - Account deletion: Settings → Delete my account (`src/auth/deleteAccount.js`). If you add a new per-user collection, delete it there too.
