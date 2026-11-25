@@ -3,7 +3,7 @@ import Constants from "expo-constants";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { deleteFullPhoto, pickProfilePhoto, saveFullPhoto } from "../profile/photo";
 import { Ionicons } from "@expo/vector-icons";
-import { RoleTag, tagFor } from "../components/RoleTag";
+import { NameWithTag, tagFor } from "../components/RoleTag";
 import { nameError } from "../profile/names";
 import { useAuth } from "../auth/AuthContext";
 import { useData } from "../data/DataContext";
@@ -119,10 +119,11 @@ export default function ProfileScreen({ navigation }) {
             )}
           </Pressable>
           {/* Under the photo: nickname if set (personal accounts), otherwise the name. Real name is in "About me". */}
-          <Text style={[common.title, { fontSize: 20 }]}>
-            <RoleTag kind={tagFor({ isOwner, isAdmin, isTester, isVerifiedOrg: isOrg && orgStatus === "verified" })} />
-            {(!isOrg && profile?.nickname) || displayName}
-          </Text>
+          <NameWithTag
+            kind={tagFor({ isOwner, isAdmin, isTester, isVerifiedOrg: isOrg && orgStatus === "verified" })}
+            name={(!isOrg && profile?.nickname) || displayName}
+            textStyle={[common.title, { fontSize: 20 }]}
+          />
           <Text style={common.meta}>{user.email}</Text>
           <View style={styles.badges}>
             {isOwner && <Badge kind="owner" />}

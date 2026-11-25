@@ -1,4 +1,7 @@
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase";
+import { NameWithTag, useRoleTagOf } from "../../components/RoleTag";
 import { Ionicons } from "@expo/vector-icons";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -64,7 +67,7 @@ export default function ChatRoomScreen({ route, navigation }) {
           const showName = !mine && data[index + 1]?.senderId !== m.senderId;
           return (
             <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-              {showName && <Text style={styles.sender}>{m.senderName}</Text>}
+              {showName && <SenderLabel uid={m.senderId} fallback={m.senderName} />}
               <Text style={[styles.text, mine && { color: "#fff" }]}>{m.text}</Text>
               <Text style={[styles.time, mine && { color: "#dbe6ff" }]}>{timeOf(m.createdAt)}</Text>
             </View>
@@ -89,12 +92,43 @@ export default function ChatRoomScreen({ route, navigation }) {
   );
 }
 
+// Sender's current name from their profile (not the copy stored on the message) plus their role pill,
+// so a message can't pass itself off as someone else's or as staff.
+const profileCache = new Map();
+function SenderLabel({ uid, fallback }) {
+  const [profile, setProfile] = useState(() => profileCache.get(uid));
+  useEffect(() => {
+    if (!uid || profileCache.has(uid)) return;
+    let alive = true;
+    getDoc(doc(db, "users", uid))
+      .then((s) => {
+        const p = s.exists() ? s.data() : null;
+        profileCache.set(uid, p);
+        if (alive) setProfile(p);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [uid]);
+  const kind = useRoleTagOf(uid, profile);
+  return (
+    <NameWithTag
+      kind={kind}
+      small
+      name={profile?.displayName || fallback || "Unknown"}
+      textStyle={styles.sender}
+      style={{ marginBottom: 2 }}
+    />
+  );
+}
+
 const styles = themed((colors) => StyleSheet.create({
   empty: { ...StyleSheet.absoluteFillObject, bottom: 70, alignItems: "center", justifyContent: "center" },
   bubble: { maxWidth: "80%", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
   mine: { alignSelf: "flex-end", backgroundColor: colors.accent, borderBottomRightRadius: 4 },
   theirs: { alignSelf: "flex-start", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
-  sender: { fontSize: 12, fontWeight: "700", color: colors.accent, marginBottom: 2 },
+  sender: { fontSize: 12, fontWeight: "700", color: colors.accent },
   text: { fontSize: 15, color: colors.text },
   time: { fontSize: 10, color: colors.muted, alignSelf: "flex-end", marginTop: 2 },
   composer: {

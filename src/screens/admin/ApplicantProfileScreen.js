@@ -4,7 +4,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useData } from "../../data/DataContext";
 import { Avatar, PhotoViewer } from "../../components/ui";
-import { RoleTag, useRoleTagOf } from "../../components/RoleTag";
+import { NameWithTag, useRoleTagOf } from "../../components/RoleTag";
 import { colors, common } from "../../theme";
 import { formatPlace } from "../../data/romania";
 
@@ -46,10 +46,7 @@ export default function ApplicantProfileScreen({ route }) {
           <Avatar name={displayName} size={88} photo={profile?.photo} />
         </Pressable>
         <PhotoViewer photo={profile?.photo} uid={uid} visible={viewingPhoto} onClose={() => setViewingPhoto(false)} />
-        <Text style={[common.title, { fontSize: 20 }]}>
-          <RoleTag kind={tag} />
-          {displayName}
-        </Text>
+        <NameWithTag kind={tag} name={displayName} textStyle={[common.title, { fontSize: 20 }]} />
         {!!status && <Text style={[common.tag, STATUS_STYLE[status]]}>{STATUS_LABEL[status] ?? status}</Text>}
       </View>
       {profile === undefined && <Text style={common.meta}>Loading profile…</Text>}

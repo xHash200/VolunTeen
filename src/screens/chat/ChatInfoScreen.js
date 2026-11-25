@@ -6,7 +6,7 @@ import { db } from "../../firebase";
 import { useAuth } from "../../auth/AuthContext";
 import { leaveGroup, setGroupDescription, TEAM_CHATS, useChat } from "../../chat/api";
 import { useTeam } from "../../admin/api";
-import { RoleTag, useRoleTagOf } from "../../components/RoleTag";
+import { NameWithTag, useRoleTagOf } from "../../components/RoleTag";
 import { Avatar, Button, Field } from "../../components/ui";
 import { colors, common, formatDate } from "../../theme";
 
@@ -171,12 +171,10 @@ function MemberRow({ member, isMe, onPress }) {
       accessibilityLabel={`Open ${name}'s profile`}
     >
       <Avatar name={name} photo={profile?.photo} />
-      {/* Just the tag and the name, e.g. "[OWN] Ana (you)". */}
-      <Text style={[common.title, { flex: 1 }]} numberOfLines={1}>
-        <RoleTag kind={kind} />
-        {name}
+      {/* Just the tag pill and the name, e.g. "OWN Ana (you)". */}
+      <NameWithTag kind={kind} name={name} textStyle={common.title} style={{ flex: 1 }}>
         {isMe ? " (you)" : ""}
-      </Text>
+      </NameWithTag>
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />
     </Pressable>
   );

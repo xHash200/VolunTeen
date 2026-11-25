@@ -34,6 +34,12 @@ service cloud.firestore {
     function privPath(uid) { return /databases/$(database)/documents/users/$(uid)/private/profile; }
     function isMember(data) { return signedIn() && request.auth.uid in data.members; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    // Names copied onto other docs (messages, chat previews, memberNames, applications) must be the
+    // writer's real profile name, so nobody can post as someone else. Role tags are pills drawn by the
+    // app from the role docs, never from these strings.
+    function myName() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('displayName', ''); }
+    // In a { uid: name } map, the writer's own entry (if any) is their real name.
+    function ownNameOk(names) { return !(request.auth.uid in names) || names[request.auth.uid] == myName(); }
 
     // Public content — readable by anyone. Staff can edit everything;
     // organizers can create events and manage only their own events and those events' roles.
@@ -81,6 +87,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['uid', 'name', 'status', 'appliedAt', 'age'])
           && request.resource.data.uid == uid
           && request.resource.data.status == 'pending'
+          && request.resource.data.get('name', '') == myName()
           && get(/databases/$(database)/documents/users/$(uid)).data.get('accountType', 'personal') != 'organization'
           && ((exists(privPath(uid)) && ageMatches(get(privPath(uid)).data.birthDate, request.resource.data.get('age', -1)))
             || (!exists(privPath(uid)) && !('age' in request.resource.data)));
@@ -199,12 +206,13 @@ service cloud.firestore {
       allow create: if isMember(request.resource.data)
         && request.resource.data.requestedBy == request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.members.size() == 2;
-      // Only the person who received the request can accept it.
+        && request.resource.data.members.size() == 2
+        && ownNameOk(request.resource.data.get('memberNames', {}));
+      // Only the person who received the request can accept it (and only the status changes).
       allow update: if isMember(resource.data)
         && resource.data.requestedBy != request.auth.uid
         && request.resource.data.status == 'accepted'
-        && request.resource.data.members == resource.data.members;
+        && changed().hasOnly(['status']);
       allow delete: if isMember(resource.data);
     }
 
@@ -227,13 +235,21 @@ service cloud.firestore {
       allow create: if (isTeamChat(chatId) && inTeamChat(chatId)
           && request.resource.data.type == 'team'
           && request.resource.data.keys().hasOnly(['type', 'name', 'lastMessage', 'lastSender', 'createdAt', 'updatedAt']))
-        || (!isTeamChat(chatId) && isMember(request.resource.data));
-      allow update: if (isTeamChat(chatId) && inTeamChat(chatId) && changed().hasOnly(['lastMessage', 'lastSender', 'updatedAt']))
-        || (!isTeamChat(chatId) && isMember(resource.data));
+        || (!isTeamChat(chatId) && isMember(request.resource.data)
+          && ownNameOk(request.resource.data.get('memberNames', {})));
+      // lastSender = the writer's real name. In memberNames you can only touch your own entry
+      // (leaving removes it; if present it must be your real name).
+      allow update: if (!changed().hasAny(['lastSender']) || request.resource.data.lastSender == myName()) && (
+        (isTeamChat(chatId) && inTeamChat(chatId) && changed().hasOnly(['lastMessage', 'lastSender', 'updatedAt']))
+        || (!isTeamChat(chatId) && isMember(resource.data)
+          && (!changed().hasAny(['memberNames'])
+            || (request.resource.data.get('memberNames', {}).diff(resource.data.get('memberNames', {})).affectedKeys().hasOnly([request.auth.uid])
+              && ownNameOk(request.resource.data.get('memberNames', {}))))));
 
       match /messages/{messageId} {
         allow read: if canUseChat(chatId);
-        allow create: if canUseChat(chatId) && request.resource.data.senderId == request.auth.uid;
+        allow create: if canUseChat(chatId) && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.get('senderName', '') == myName();
       }
     }
   }
